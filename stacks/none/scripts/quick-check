@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Fast checks run before Claude stops (typecheck, lint on changed files). Nothing set up yet.
+exit 0
