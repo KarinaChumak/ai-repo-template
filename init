@@ -1,0 +1,263 @@
+#!/usr/bin/env bash
+# Writes the Claude Code setup from this template into a repo. Must run on macOS's bash 3.2.
+set -euo pipefail
+
+here=$(cd "$(dirname "$0")" && pwd)
+
+usage() {
+  cat <<EOF
+Usage: ./init [--stack <name>] [--mode solo|team] [--into <dir>] [--decisions-file <path>] [--name <project>] [--force]
+
+  --stack           Which stack to set up. Asked interactively if omitted.
+  --mode            solo (default) or team. Team adds CODEOWNERS.
+  --into            Add the setup to an existing repo instead of turning this clone into the project.
+  --decisions-file  Where the decision log goes, relative to the repo root. Default: .claude/decisions.md
+  --name            Project name for starter stacks. Defaults to the target folder name.
+  --force           Overwrite files that already exist. Without it, existing files are kept and listed.
+
+Stacks:
+EOF
+  list_stacks
+}
+
+list_stacks() {
+  local dir s d
+  for dir in "$here"/stacks/*/; do
+    s=$(basename "$dir")
+    d=$(sed -n 's/^DESCRIPTION="\(.*\)"$/\1/p' "$dir/stack.conf")
+    printf '  %-14s %s\n' "$s" "$d"
+  done
+}
+
+die() {
+  echo "init: $*" >&2
+  exit 1
+}
+
+[ -d "$here/core" ] && [ -d "$here/stacks" ] || die "run this from a clone of ai-repo-template."
+command -v jq >/dev/null || die "jq is required (brew install jq)."
+
+stack="" mode="" name="" into="" decisions=".claude/decisions.md" force=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --stack) stack=${2:?}; shift 2 ;;
+    --mode) mode=${2:?}; shift 2 ;;
+    --name) name=${2:?}; shift 2 ;;
+    --into) into=${2:?}; shift 2 ;;
+    --decisions-file) decisions=${2:?}; shift 2 ;;
+    --force) force=1; shift ;;
+    -h | --help) usage; exit 0 ;;
+    *) usage >&2; die "unknown option $1" ;;
+  esac
+done
+
+if [ -z "$stack" ]; then
+  [ -t 0 ] || die "--stack is required when not running interactively."
+  echo "Stacks:"
+  list_stacks
+  read -r -p "Stack: " stack
+fi
+[ -n "$stack" ] && [ -f "$here/stacks/$stack/stack.conf" ] || die "unknown stack '$stack'. Run ./init --help to list stacks."
+
+if [ -z "$mode" ] && [ -t 0 ]; then
+  read -r -p "Mode (solo/team) [solo]: " mode
+fi
+mode=${mode:-solo}
+case "$mode" in solo | team) ;; *) die "mode must be solo or team." ;; esac
+
+case "$decisions" in /* | *..* | */) die "--decisions-file must be a file path inside the repo, like DECISIONS.md." ;; esac
+printf '%s' "$decisions" | grep -Eq '^[A-Za-z0-9._/-]+$' || die "--decisions-file may only contain letters, digits, '.', '_', '-' and '/'."
+
+if [ -n "$into" ]; then
+  [ -d "$into" ] || die "$into is not a directory."
+  target=$(cd "$into" && pwd)
+  [ "$target" != "$here" ] || die "--into points at the template itself."
+  inplace=0
+else
+  target=$here
+  inplace=1
+fi
+
+KIND="" DESCRIPTION=""
+# shellcheck disable=SC1090
+. "$here/stacks/$stack/stack.conf"
+
+name=${name:-$(basename "$target")}
+slug=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//')
+template_commit=$(git -C "$here" rev-parse --short HEAD 2>/dev/null || echo unknown)
+
+# Work from a copy, because in-place mode deletes the template's own files.
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+cp -R "$here/core" "$tmp/core"
+cp -R "$here/team" "$tmp/team"
+cp -R "$here/stacks/$stack" "$tmp/stack"
+src_core="$tmp/core"
+src_stack="$tmp/stack"
+
+created=()
+skipped=()
+pending=()
+
+place() {
+  local src=$1 rel=$2 dest="$target/$2"
+  if [ -e "$dest" ] && [ "$force" -eq 0 ]; then
+    skipped+=("$rel")
+    return
+  fi
+  mkdir -p "$(dirname "$dest")"
+  cp -p "$src" "$dest"
+  created+=("$rel")
+}
+
+copy_tree() {
+  local root=$1 prefix=${2:-} f rel
+  [ -d "$root" ] || return 0
+  while IFS= read -r f; do
+    rel=$prefix${f#"$root"/}
+    place "$f" "$rel"
+  done < <(find "$root" -type f ! -name .DS_Store | sort)
+}
+
+# Replaces each line that is only @@STACK_<NAME>@@ with stacks/<stack>/claude/<name>.md (or nothing),
+# and __DECISIONS_FILE__ with the decision log's path.
+render() {
+  awk -v dir="$2" '
+    /^[ \t]*@@STACK_[A-Z]+@@[ \t]*$/ {
+      n = $0
+      gsub(/[ \t@]/, "", n)
+      sub(/^STACK_/, "", n)
+      f = dir "/" tolower(n) ".md"
+      while ((getline line < f) > 0) print line
+      close(f)
+      next
+    }
+    { print }
+  ' "$1" | sed "s|__DECISIONS_FILE__|$decisions|g"
+}
+
+append_missing_lines() {
+  local rel=$1 dest="$target/$1" src line added=0
+  shift
+  mkdir -p "$(dirname "$dest")"
+  [ -f "$dest" ] || : >"$dest"
+  for src in "$@"; do
+    [ -f "$src" ] || continue
+    while IFS= read -r line || [ -n "$line" ]; do
+      [ -n "$line" ] || continue
+      grep -qxF -- "$line" "$dest" && continue
+      if [ -s "$dest" ] && [ -n "$(tail -c1 "$dest")" ]; then echo >>"$dest"; fi
+      echo "$line" >>"$dest"
+      added=1
+    done <"$src"
+  done
+  [ "$added" -eq 0 ] || created+=("$rel")
+}
+
+# The first of the given paths that exists in the target, or nothing.
+existing() {
+  local p
+  for p in "$@"; do
+    if [ -e "$target/$p" ]; then
+      echo "$p"
+      return
+    fi
+  done
+}
+
+merge_json='
+  def merge($a; $b):
+    reduce ($b | keys_unsorted[]) as $k ($a;
+      .[$k] = (
+        if ($a[$k] | type) == "object" and ($b[$k] | type) == "object" then merge($a[$k]; $b[$k])
+        elif ($a[$k] | type) == "array" and ($b[$k] | type) == "array" then $a[$k] + ($b[$k] - $a[$k])
+        else $b[$k] end));
+  reduce .[] as $x ({}; merge(.; $x))
+'
+
+render "$src_core/CLAUDE.md" "$src_stack/claude" >"$tmp/CLAUDE.md"
+render "$src_core/REVIEW.md" "$src_stack/claude" >"$tmp/REVIEW.md"
+echo "$decisions merge=union" >"$tmp/gitattributes"
+
+settings="$target/.claude/settings.json"
+settings_inputs=("$src_core/settings.json")
+[ ! -f "$src_stack/settings.json" ] || settings_inputs+=("$src_stack/settings.json")
+[ ! -f "$settings" ] || settings_inputs=("$settings" "${settings_inputs[@]}")
+jq -s "$merge_json" "${settings_inputs[@]}" >"$tmp/settings.json"
+
+if [ "$inplace" -eq 1 ]; then
+  for p in core stacks team tests init README.md CLAUDE.md; do
+    rm -rf "${here:?}/$p"
+  done
+fi
+
+copy_tree "$src_core/tree"
+copy_tree "$src_stack/tree"
+copy_tree "$src_stack/scripts" ".claude/scripts/"
+[ "$mode" = team ] && copy_tree "$tmp/team/tree"
+
+# A repo that already has guidance keeps it: the generated version is set aside for merging.
+for doc in CLAUDE.md REVIEW.md; do
+  have=$(existing ".claude/$doc" "$doc")
+  if [ -n "$have" ] && cmp -s "$tmp/$doc" "$target/$have"; then
+    continue # already set up by an earlier run
+  elif [ -n "$have" ] && [ "$force" -eq 0 ]; then
+    mkdir -p "$target/.claude/ai-setup-pending"
+    cp "$tmp/$doc" "$target/.claude/ai-setup-pending/$doc"
+    pending+=("$have")
+  else
+    place "$tmp/$doc" ".claude/$doc"
+  fi
+done
+place "$src_core/decisions.md" "$decisions"
+[ ! -f "$src_stack/README.md.tpl" ] || place "$src_stack/README.md.tpl" README.md
+
+mkdir -p "$target/.claude"
+if [ -f "$settings" ]; then created+=(".claude/settings.json (merged)"); else created+=(".claude/settings.json"); fi
+cp "$tmp/settings.json" "$settings"
+
+append_missing_lines .claude/protected-paths "$src_core/protected-paths" "$src_stack/protected-paths"
+append_missing_lines .gitignore "$src_core/gitignore" "$src_stack/gitignore"
+append_missing_lines .gitattributes "$tmp/gitattributes"
+append_missing_lines .worktreeinclude "$src_core/worktreeinclude"
+
+chmod +x "$target"/.claude/scripts/* "$target"/.claude/hooks/*.sh 2>/dev/null || true
+
+jq -n --arg stack "$stack" --arg mode "$mode" --arg commit "$template_commit" --arg decisions "$decisions" \
+  --arg date "$(date -u +%F)" \
+  '{template: "ai-repo-template", template_commit: $commit, stack: $stack, mode: $mode, decisions_file: $decisions, created: $date}' \
+  >"$target/.claude/ai-setup.json"
+
+if [ "$KIND" = starter ]; then
+  while IFS= read -r f; do
+    sed -i.bak "s/__PROJECT_NAME__/$slug/g" "$f" && rm -f "$f.bak"
+  done < <(grep -rlF __PROJECT_NAME__ "$target" --exclude-dir=.git --exclude-dir=node_modules 2>/dev/null || true)
+fi
+
+echo
+echo "Set up '$stack' ($mode) in $target"
+echo "Written: ${#created[@]} files"
+if [ "${#skipped[@]}" -gt 0 ]; then
+  echo
+  echo "Kept existing files (rerun with --force to overwrite, or merge by hand):"
+  printf '  %s\n' "${skipped[@]}"
+fi
+if [ "${#pending[@]}" -gt 0 ]; then
+  echo
+  echo "This repo already has ${pending[*]}. The generated versions are in .claude/ai-setup-pending/. Ask Claude:"
+  for have in "${pending[@]}"; do
+    echo "  merge .claude/ai-setup-pending/$(basename "$have") into $have, keeping this repo's content."
+  done
+  echo "  Then delete .claude/ai-setup-pending."
+fi
+echo
+echo "Next:"
+if [ "$KIND" = starter ]; then
+  echo "  .claude/scripts/setup && .claude/scripts/check"
+else
+  echo "  Fill in .claude/scripts/ for this repo's tools, then run .claude/scripts/check."
+fi
+echo "  Fill in the Project section of .claude/CLAUDE.md, then commit."
+if [ "$mode" = team ]; then
+  echo "  Replace the teams in .github/CODEOWNERS and set up branch protection."
+fi
