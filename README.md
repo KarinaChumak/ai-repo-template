@@ -66,6 +66,7 @@ A stack is either a **starter** (ships app code in `tree/`, for new projects) or
 | --- | --- |
 | `.claude/CLAUDE.md` | Commands, what "done" means, conventions, gotchas, and the `#` feedback rule |
 | `.claude/REVIEW.md` | What reviewers flag and skip, evidence rules, Important/Nit/Pre-existing tags |
+| `.claude/skills/kickoff`, `plan-phase` | `/kickoff` turns an idea into decisions, `.claude/product.md` and a phased `.claude/plan.md` with only Phase 1 broken into tickets. `/plan-phase` breaks down the next phase: behavior slices, PRs under 500 lines, parallel lanes |
 | `.claude/decisions.md` | Decisions that affect more than one ticket. Entries are only ever added, and git merges the file with the `union` driver so parallel branches never conflict |
 | `.claude/scripts/` | `setup`, `check`, `test`, `fix`, `quick-check`: the only commands hooks, skills and CI call |
 | `.claude/settings.json` | Permissions (merging PRs is denied: a human merges), plus hooks: protect paths before edits, format after edits, `quick-check` before Claude stops |

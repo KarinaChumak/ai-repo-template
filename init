@@ -95,14 +95,15 @@ cp -R "$here/stacks/$stack" "$tmp/stack"
 src_core="$tmp/core"
 src_stack="$tmp/stack"
 
-# Fill in the project's name in the copy, before anything is placed, so files that were already in
-# the target are never touched. __PROJECT_NAME__ is the package slug; __PROJECT_TITLE__ is the name
-# people see, kept to characters that are safe in sed, HTML and JSX.
+# Fill in placeholders in the copy, before anything is placed, so files that were already in the
+# target are never touched. __PROJECT_NAME__ is the package slug; __PROJECT_TITLE__ is the name people
+# see, kept to characters that are safe in sed, HTML and JSX; __DECISIONS_FILE__ is the decision log.
 title=$(printf '%s' "$name" | tr -cd 'A-Za-z0-9 ._-')
 title=${title:-$slug}
 while IFS= read -r f; do
-  sed -i.bak "s/__PROJECT_NAME__/$slug/g; s/__PROJECT_TITLE__/$title/g" "$f" && rm -f "$f.bak"
-done < <(grep -rlE '__PROJECT_(NAME|TITLE)__' "$src_stack" 2>/dev/null || true)
+  sed -i.bak "s/__PROJECT_NAME__/$slug/g; s/__PROJECT_TITLE__/$title/g; s|__DECISIONS_FILE__|$decisions|g" "$f" &&
+    rm -f "$f.bak"
+done < <(grep -rlE '__(PROJECT_NAME|PROJECT_TITLE|DECISIONS_FILE)__' "$tmp" 2>/dev/null || true)
 
 pending_dir="$target/.claude/ai-setup-pending"
 created=()
