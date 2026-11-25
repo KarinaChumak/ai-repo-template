@@ -36,6 +36,7 @@ Present each one as a decision, not an open question:
 
    ```markdown
    ## Kickoff: Multi-tenancy
+
    One database, `org_id` on every row. Why: simplest to run. Rejected: schema per org, database per org.
    ```
 

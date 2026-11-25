@@ -70,9 +70,10 @@ A stack is either a **starter** (ships app code in `tree/`, for new projects) or
 | `.claude/CLAUDE.md` | Commands, what "done" means, conventions, gotchas, and the `#` feedback rule |
 | `.claude/REVIEW.md` | What reviewers flag and skip, evidence rules, Important/Nit/Pre-existing tags |
 | `.claude/skills/kickoff`, `plan-phase` | `/kickoff` turns an idea into decisions, `ai/product.md` and a phased `ai/plan.md` with only Phase 1 broken into tickets. `/plan-phase` breaks down the next phase: behavior slices, PRs under 500 lines, parallel lanes |
+| `.claude/skills/ticket`, `wrap-up` | "work on ticket T-04" (or `/ticket T-04`) runs `.claude/scripts/ticket start`, which makes a branch and a worktree in `.claude/worktrees/T-04` with its own dev-server port, and moves the session there, so the main checkout stays on `main` and tickets run in parallel. Claude reads the ticket and the latest decisions, proposes an approach, waits for your OK, then builds. `/wrap-up` proves each "done when", runs `check`, updates the ticket, records global decisions and drafts the PR. `ticket remove T-04` cleans up after the merge |
 | `ai/decisions.md` | Decisions that affect more than one ticket. Entries are only ever added, and git merges the file with the `union` driver so parallel branches never conflict |
-| `.claude/scripts/` | `setup`, `check`, `test`, `fix`, `quick-check`: the only commands hooks, skills and CI call |
-| `.claude/settings.json` | Permissions (merging PRs is denied: a human merges), plus hooks: protect paths before edits, format after edits, `quick-check` before Claude stops |
+| `.claude/scripts/` | `setup`, `check`, `test`, `fix`, `quick-check`, `ticket`: the only commands hooks, skills and CI call |
+| `.claude/settings.json` | Permissions (merging PRs is denied: a human merges), plus hooks: the current ticket's section from `ai/plan.md` at session start and after compaction, protect paths before edits, format after edits, `quick-check` before Claude stops |
 | `.claude/protected-paths` | Globs Claude may not edit. Starts with `.github/workflows/*` |
 | `.claude/ai-setup.json` | Which template commit, stack, mode and decisions file it came from |
 | `.github/pull_request_template.md` | Why, testing, decisions, risk, how to revert |

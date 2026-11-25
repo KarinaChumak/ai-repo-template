@@ -6,5 +6,6 @@ Decisions that affect more than one ticket. Add new entries at the end and never
 Entry format:
 
 ## <ticket ID> <short title>
+
 <What was decided.> Why: <the reason>. Rejected: <the alternatives>.
 -->
