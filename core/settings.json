@@ -6,6 +6,8 @@
       "Bash(.claude/scripts/test)",
       "Bash(.claude/scripts/test *)",
       "Bash(.claude/scripts/fix *)",
+      "Bash(.claude/scripts/pr-size)",
+      "Bash(.claude/scripts/pr-size *)",
       "Bash(git status)",
       "Bash(git diff *)",
       "Bash(git log *)",

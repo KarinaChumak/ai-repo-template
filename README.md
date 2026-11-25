@@ -43,6 +43,7 @@ git clone https://github.com/<you>/ai-repo-template ~/Code/ai-repo-template
 | `--mode solo\|team` | `solo` | `team` adds `.github/CODEOWNERS` so `.claude/` and `.github/` always need a code owner's review |
 | `--into <dir>` | this clone | Add the setup to an existing repo |
 | `--decisions-file <path>` | `ai/decisions.md` | Where the decision log goes, for a project that needs it somewhere else, such as `DECISIONS.md` |
+| `--ci-review` | off | Add `.github/workflows/claude-review.yml`: Claude reviews a PR (code and security, one pass) when it's marked ready, and answers `@claude` in PR comments. Needs the Claude GitHub app (`/install-github-app`) and an `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` secret |
 | `--force` | off | Overwrite existing files |
 
 ## Stacks
@@ -71,10 +72,13 @@ A stack is either a **starter** (ships app code in `tree/`, for new projects) or
 | `.claude/REVIEW.md` | What reviewers flag and skip, evidence rules, Important/Nit/Pre-existing tags |
 | `.claude/skills/kickoff`, `plan-phase` | `/kickoff` turns an idea into decisions, `ai/product.md` and a phased `ai/plan.md` with only Phase 1 broken into tickets. `/plan-phase` breaks down the next phase: behavior slices, PRs under 500 lines, parallel lanes |
 | `.claude/skills/ticket`, `wrap-up` | "work on ticket T-04" (or `/ticket T-04`) runs `.claude/scripts/ticket start`, which makes a branch and a worktree in `.claude/worktrees/T-04` with its own dev-server port, and moves the session there, so the main checkout stays on `main` and tickets run in parallel. Claude reads the ticket and the latest decisions, proposes an approach, waits for your OK, then builds. `/wrap-up` proves each "done when", runs `check`, updates the ticket, records global decisions and drafts the PR. `ticket remove T-04` cleans up after the merge |
+| `.claude/skills/pre-pr`, `address-review`, `.claude/agents/reviewer.md` | `/pre-pr`, run after `/wrap-up`: size check, `check`, a draft PR, then `/code-review` and the `reviewer` agent post their checked findings as inline comments starting with `🤖 Claude review:`, then `/simplify`, UI checks where the stack has them, and `check` again. You resolve the comments that shouldn't be fixed and leave the rest open; `/address-review` fixes the open ones, replies and resolves them |
 | `ai/decisions.md` | Decisions that affect more than one ticket. Entries are only ever added, and git merges the file with the `union` driver so parallel branches never conflict |
-| `.claude/scripts/` | `setup`, `check`, `test`, `fix`, `quick-check`, `ticket`: the only commands hooks, skills and CI call |
+| `.claude/scripts/` | `setup`, `check`, `test`, `fix`, `quick-check`, `ticket`, `pr-size`: the only commands hooks, skills and CI call |
 | `.claude/settings.json` | Permissions (merging PRs is denied: a human merges), plus hooks: the current ticket's section from `ai/plan.md` at session start and after compaction, protect paths before edits, format after edits, `quick-check` before Claude stops |
 | `.claude/protected-paths` | Globs Claude may not edit. Starts with `.github/workflows/*` |
+| `.claude/pr-size-ignore` | Globs that don't count toward the 500-line PR limit: lockfiles, snapshots, `ai/*` |
+| `.github/workflows/pr-size.yml` | Fails a PR over 500 changed lines, unless a human adds the `size-exception` label |
 | `.claude/ai-setup.json` | Which template commit, stack, mode and decisions file it came from |
 | `.github/pull_request_template.md` | Why, testing, decisions, risk, how to revert |
 
