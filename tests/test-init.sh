@@ -32,8 +32,8 @@ hook_exit() {
 check_result() {
   local dir=$1 label=$2 mode=$3 decisions=${4:-ai/decisions.md} f
   for f in .claude/CLAUDE.md .claude/REVIEW.md .claude/settings.json .claude/protected-paths .claude/ai-setup.json \
-    .claude/hooks/protect-paths.sh .claude/hooks/format.sh .claude/hooks/stop-check.sh \
-    .claude/skills/kickoff/SKILL.md .claude/skills/plan-phase/SKILL.md \
+    .claude/hooks/protect-paths.sh .claude/hooks/format.sh .claude/hooks/stop-check.sh .claude/hooks/ticket-context.sh \
+    .claude/skills/kickoff/SKILL.md .claude/skills/plan-phase/SKILL.md .claude/skills/ticket/SKILL.md .claude/skills/wrap-up/SKILL.md \
     .github/pull_request_template.md .gitignore .gitattributes .worktreeinclude "$decisions"; do
     [ -e "$dir/$f" ] || fail "$label: missing $f"
   done
@@ -41,7 +41,7 @@ check_result() {
     fail "$label: placeholder left in .claude/"
   fi
   grep -qF "\`$decisions\`" "$dir/.claude/skills/kickoff/SKILL.md" || fail "$label: kickoff doesn't name $decisions"
-  for f in setup check test fix quick-check; do
+  for f in setup check test fix quick-check ticket; do
     [ -x "$dir/.claude/scripts/$f" ] || fail "$label: .claude/scripts/$f missing or not executable"
   done
   for f in CLAUDE.md REVIEW.md DESIGN.md scripts; do
@@ -128,7 +128,7 @@ tree_sum() {
 new_project() {
   local dest=$1
   mkdir -p "$dest"
-  (cd "$here" && tar --exclude=.git --exclude=node_modules --exclude=docs -cf - .) | (cd "$dest" && tar -xf -)
+  (cd "$here" && tar --exclude=.git --exclude=.claude/worktrees --exclude=node_modules --exclude=docs -cf - .) | (cd "$dest" && tar -xf -)
 }
 
 for stack_dir in "$here"/stacks/*/; do
@@ -219,6 +219,50 @@ done
 echo "== none: root holds only files other tools require"
 root=$(cd "$work/new-none-solo/My App" && ls -A | sort | tr '\n' ' ')
 [ "$root" = ".claude .gitattributes .github .gitignore .worktreeinclude ai " ] || fail "none: unexpected files at root: $root"
+
+echo "== ticket: parallel tickets get their own worktree, branch and port"
+origin="$work/ticket-origin.git"
+repo="$work/ticket-repo"
+mkdir -p "$repo"
+repo=$(cd "$repo" && pwd -P)
+run_init "$here/init" --stack none --into "$repo"
+(
+  cd "$repo"
+  git init -q -b main 2>/dev/null || { git init -q && git checkout -q -b main; }
+  mkdir -p ai
+  printf '# Plan\n\n## Phase 1: Skeleton\n\n### T-01 Sign in\n\n- Status: todo\n\n### T-010 Other\n\n- Status: todo\n\n### T-02 Dashboard\n\n- Status: todo\n\n## Notes\n\nnot a ticket\n' >ai/plan.md
+  git -c user.name=t -c user.email=t@t add -A
+  git -c user.name=t -c user.email=t@t commit -qm init
+  git clone -q --bare . "$origin" && git remote add origin "$origin" && git fetch -q origin
+  echo 'SECRET=1' >.env
+) || fail "ticket: setting up the repo failed"
+t1=$(cd "$repo" && "$bash_bin" .claude/scripts/ticket start T-01 "Sign In!") || fail "ticket: start T-01 failed"
+t2=$(cd "$repo" && "$bash_bin" .claude/scripts/ticket start T-02 dashboard) || fail "ticket: start T-02 failed"
+field() { printf '%s\n' "$1" | sed -n "s/^$2=//p"; }
+[ "$(field "$t1" path)" = "$repo/.claude/worktrees/T-01" ] || fail "ticket: T-01 path is $(field "$t1" path)"
+[ "$(field "$t1" branch)" = T-01-sign-in ] || fail "ticket: T-01 branch is $(field "$t1" branch)"
+[ "$(field "$t2" branch)" = T-02-dashboard ] || fail "ticket: T-02 branch is $(field "$t2" branch)"
+[ "$(field "$t1" port)" != "$(field "$t2" port)" ] || fail "ticket: both tickets got port $(field "$t1" port)"
+[ "$(field "$t1" new)" = yes ] || fail "ticket: first start of T-01 isn't new"
+[ "$(git -C "$repo" branch --show-current)" = main ] || fail "ticket: the main checkout left main"
+[ -z "$(git -C "$repo" status --porcelain)" ] || fail "ticket: the main checkout has changes: $(git -C "$repo" status --porcelain)"
+[ "$(cat "$repo/.claude/worktrees/T-01/.env" 2>/dev/null)" = SECRET=1 ] || fail "ticket: .env wasn't copied into the worktree"
+again=$(cd "$repo/.claude/worktrees/T-02" && "$bash_bin" .claude/scripts/ticket start T-01) || fail "ticket: starting T-01 again failed"
+[ "$(field "$again" new)" = no ] && [ "$(field "$again" port)" = "$(field "$t1" port)" ] ||
+  fail "ticket: starting T-01 again from another worktree gave: $again"
+if (cd "$repo" && "$bash_bin" .claude/scripts/ticket start '../x' >/dev/null 2>&1); then fail "ticket: accepted the ID ../x"; fi
+ctx=$(CLAUDE_PROJECT_DIR="$repo/.claude/worktrees/T-01" "$bash_bin" "$repo/.claude/hooks/ticket-context.sh")
+printf '%s\n' "$ctx" | grep -qF '### T-01 Sign in' || fail "ticket: SessionStart hook didn't print T-01's section"
+if printf '%s\n' "$ctx" | grep -qE 'T-010|T-02|Phase|Notes'; then fail "ticket: hook printed more than T-01's section: $ctx"; fi
+[ -z "$(CLAUDE_PROJECT_DIR=$repo "$bash_bin" "$repo/.claude/hooks/ticket-context.sh")" ] || fail "ticket: hook printed something on main"
+git -C "$repo/.claude/worktrees/T-02" checkout -q -b T-010-other
+ctx=$(CLAUDE_PROJECT_DIR="$repo/.claude/worktrees/T-02" "$bash_bin" "$repo/.claude/hooks/ticket-context.sh")
+printf '%s\n' "$ctx" | grep -qF '### T-010 Other' || fail "ticket: hook on branch T-010-other didn't pick T-010: $ctx"
+(cd "$repo" && "$bash_bin" .claude/scripts/ticket remove T-01 >/dev/null) || fail "ticket: remove T-01 failed"
+[ ! -e "$repo/.claude/worktrees/T-01" ] || fail "ticket: remove left the worktree"
+if git -C "$repo" rev-parse -q --verify T-01-sign-in >/dev/null; then fail "ticket: remove kept the merged branch"; fi
+t3=$(cd "$repo" && "$bash_bin" .claude/scripts/ticket start T-03) || fail "ticket: start T-03 failed"
+[ "$(field "$t3" port)" = "$(field "$t1" port)" ] || fail "ticket: T-03 didn't reuse the freed port"
 
 echo "== every skill has a name matching its folder and a description"
 while IFS= read -r skill; do

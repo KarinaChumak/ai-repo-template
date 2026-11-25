@@ -4,3 +4,5 @@
 CLAUDE.local.md
 .claude/settings.local.json
 .claude/ai-setup-pending/
+.claude/worktrees/
+.claude/ticket.env

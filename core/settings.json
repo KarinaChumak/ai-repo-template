@@ -8,12 +8,18 @@
       "Bash(.claude/scripts/fix *)",
       "Bash(git status)",
       "Bash(git diff *)",
-      "Bash(git log *)"
+      "Bash(git log *)",
+      "Bash(.claude/scripts/ticket *)"
     ],
     "ask": ["Bash(git push *)"],
     "deny": ["Bash(gh pr merge *)", "Read(./.env)", "Read(./.env.*)", "Read(./secrets/**)"]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ticket-context.sh" }]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Edit|Write",
