@@ -34,14 +34,18 @@ check_result() {
   for f in .claude/CLAUDE.md .claude/REVIEW.md .claude/settings.json .claude/protected-paths .claude/ai-setup.json \
     .claude/hooks/protect-paths.sh .claude/hooks/format.sh .claude/hooks/stop-check.sh .claude/hooks/ticket-context.sh \
     .claude/skills/kickoff/SKILL.md .claude/skills/plan-phase/SKILL.md .claude/skills/ticket/SKILL.md .claude/skills/wrap-up/SKILL.md \
+    .claude/skills/pre-pr/SKILL.md .claude/skills/address-review/SKILL.md .claude/agents/reviewer.md .claude/pr-size-ignore \
+    .github/workflows/pr-size.yml \
     .github/pull_request_template.md .gitignore .gitattributes .worktreeinclude "$decisions"; do
     [ -e "$dir/$f" ] || fail "$label: missing $f"
   done
   if grep -rlE '__(PROJECT_NAME|PROJECT_TITLE|DECISIONS_FILE)__' "$dir/.claude" >/dev/null 2>&1; then
     fail "$label: placeholder left in .claude/"
   fi
+  [ ! -e "$dir/.github/workflows/claude-review.yml" ] || fail "$label: claude-review.yml without --ci-review"
+  grep -qF "\`$decisions\`" "$dir/.claude/agents/reviewer.md" || fail "$label: the reviewer agent doesn't name $decisions"
   grep -qF "\`$decisions\`" "$dir/.claude/skills/kickoff/SKILL.md" || fail "$label: kickoff doesn't name $decisions"
-  for f in setup check test fix quick-check ticket; do
+  for f in setup check test fix quick-check ticket pr-size; do
     [ -x "$dir/.claude/scripts/$f" ] || fail "$label: .claude/scripts/$f missing or not executable"
   done
   for f in CLAUDE.md REVIEW.md DESIGN.md scripts; do
@@ -263,6 +267,63 @@ printf '%s\n' "$ctx" | grep -qF '### T-010 Other' || fail "ticket: hook on branc
 if git -C "$repo" rev-parse -q --verify T-01-sign-in >/dev/null; then fail "ticket: remove kept the merged branch"; fi
 t3=$(cd "$repo" && "$bash_bin" .claude/scripts/ticket start T-03) || fail "ticket: start T-03 failed"
 [ "$(field "$t3" port)" = "$(field "$t1" port)" ] || fail "ticket: T-03 didn't reuse the freed port"
+
+echo "== pr-size: counts the branch's lines, skips ignored files, fails over the limit"
+repo="$work/size-repo"
+mkdir -p "$repo"
+run_init "$here/init" --stack none --into "$repo"
+lines() { i=0; while [ "$i" -lt "$1" ]; do echo "line $i"; i=$((i + 1)); done; }
+size() { (cd "$repo" && PR_SIZE_LIMIT=${limit:-500} "$bash_bin" .claude/scripts/pr-size main 2>&1); }
+(
+  cd "$repo"
+  git init -q -b main 2>/dev/null || { git init -q && git checkout -q -b main; }
+  echo 'src/generated/*' >>.claude/pr-size-ignore
+  git -c user.name=t -c user.email=t@t add -A
+  git -c user.name=t -c user.email=t@t commit -qm init
+  git checkout -qb T-01-size
+  mkdir -p src/generated/deep ai
+  lines 300 >src/a.ts
+  lines 2000 >pnpm-lock.yaml
+  lines 900 >src/generated/deep/api.ts
+  lines 100 >ai/plan.md
+  git -c user.name=t -c user.email=t@t add -A
+  git -c user.name=t -c user.email=t@t commit -qm a
+) || fail "pr-size: setting up the repo failed"
+out=$(size) || fail "pr-size: failed at 300 lines: $out"
+printf '%s\n' "$out" | grep -qF 'pr-size: 300 changed lines against main (limit 500); 3000 more in ignored files' ||
+  fail "pr-size: wrong count: $out"
+lines 250 >"$repo/src/b.ts"
+if out=$(size); then fail "pr-size: passed at 550 lines, counting the untracked file: $out"; fi
+printf '%s\n' "$out" | grep -qF 'size-exception' || fail "pr-size: no advice when over the limit: $out"
+out=$(limit=600 size) || fail "pr-size: PR_SIZE_LIMIT=600 didn't raise the limit: $out"
+rm "$repo/src/b.ts"
+sed -i.bak '1,200d' "$repo/src/a.ts" && rm "$repo/src/a.ts.bak"
+(cd "$repo" && git -c user.name=t -c user.email=t@t commit -qam shrink)
+out=$(size)
+printf '%s\n' "$out" | grep -qF 'pr-size: 100 changed lines' || fail "pr-size: deleted lines on the branch aren't counted: $out"
+
+echo "== --ci-review adds the Claude review workflow"
+repo="$work/ci-review"
+mkdir -p "$repo"
+run_init "$here/init" --stack none --into "$repo" --ci-review
+grep -qF 'anthropics/claude-code-action@' "$repo/.github/workflows/claude-review.yml" || fail "ci-review: no claude-review.yml"
+grep -qE 'claude-code-action@[0-9a-f]{40}' "$repo/.github/workflows/claude-review.yml" || fail "ci-review: action isn't pinned to a SHA"
+jq -e '.ci_review == true' "$repo/.claude/ai-setup.json" >/dev/null || fail "ci-review: ai-setup.json doesn't record it"
+
+echo "== workflows pass actionlint"
+if command -v actionlint >/dev/null; then
+  actionlint "$here"/core/tree/.github/workflows/*.yml "$here"/core/ci-review/*.yml "$here"/stacks/*/tree/.github/workflows/*.yml ||
+    fail "actionlint found problems"
+else
+  echo "  skipped: actionlint isn't installed"
+fi
+
+echo "== every agent has a name matching its file, a description and tools"
+for agent in "$here"/core/tree/.claude/agents/*.md; do
+  grep -qxF "name: $(basename "$agent" .md)" "$agent" || fail "$agent: name doesn't match the file"
+  grep -qE '^description: .{40,}' "$agent" || fail "$agent: description missing or too short"
+  grep -qE '^tools: ' "$agent" || fail "$agent: no tools list"
+done
 
 echo "== every skill has a name matching its folder and a description"
 while IFS= read -r skill; do
