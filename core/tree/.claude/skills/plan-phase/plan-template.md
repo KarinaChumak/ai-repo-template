@@ -1,11 +1,15 @@
 # Plan
 
-Phases run in order. Only the current phase is broken into tickets; later phases stay one-line goals until `/plan-phase` breaks them down. Decisions live in `__DECISIONS_FILE__`.
+Phases run in order. Each has a one-line goal and exit below. Only the phases that `/plan-phase` has broken down get a section with tickets. Decisions live in `__DECISIONS_FILE__`.
 
-## Phase 1: Walking skeleton (current)
+## Phases
 
-Goal: the thinnest version that works end to end.
-Exit: <what must be true to move on>.
+1. **Walking skeleton** (current): <goal>. Exit: <what must be true to move on>.
+2. **<Name>**: <goal>. Exit: <what must be true to move on>.
+
+## Phase 1: Walking skeleton
+
+Lanes: T-01, then T-02 ‖ T-03.
 
 ### T-01 <Behavior the user can see>
 
@@ -17,8 +21,3 @@ Exit: <what must be true to move on>.
 - PRs: one
 - After: none
 - Branch: none yet
-
-## Phase 2: <Name>
-
-Goal: <one line>.
-Exit: <one line>.

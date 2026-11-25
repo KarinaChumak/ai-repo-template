@@ -30,7 +30,7 @@ hook_exit() {
 }
 
 check_result() {
-  local dir=$1 label=$2 mode=$3 decisions=${4:-.claude/decisions.md} f
+  local dir=$1 label=$2 mode=$3 decisions=${4:-ai/decisions.md} f
   for f in .claude/CLAUDE.md .claude/REVIEW.md .claude/settings.json .claude/protected-paths .claude/ai-setup.json \
     .claude/hooks/protect-paths.sh .claude/hooks/format.sh .claude/hooks/stop-check.sh \
     .claude/skills/kickoff/SKILL.md .claude/skills/plan-phase/SKILL.md \
@@ -185,7 +185,7 @@ for stack_dir in "$here"/stacks/*/; do
   mkdir -p "$repo"
   run_init "$here/init" --stack "$stack" --into "$repo" --decisions-file DECISIONS.md
   check_result "$repo" "$label" solo DECISIONS.md
-  [ ! -e "$repo/.claude/decisions.md" ] || fail "$label: also wrote .claude/decisions.md"
+  [ ! -e "$repo/ai/decisions.md" ] || fail "$label: also wrote ai/decisions.md"
   check_union_merge "$repo" "$label" DECISIONS.md
 
   for with_pkg in 0 1; do
@@ -218,7 +218,7 @@ done
 
 echo "== none: root holds only files other tools require"
 root=$(cd "$work/new-none-solo/My App" && ls -A | sort | tr '\n' ' ')
-[ "$root" = ".claude .gitattributes .github .gitignore .worktreeinclude " ] || fail "none: unexpected files at root: $root"
+[ "$root" = ".claude .gitattributes .github .gitignore .worktreeinclude ai " ] || fail "none: unexpected files at root: $root"
 
 echo "== every skill has a name matching its folder and a description"
 while IFS= read -r skill; do
@@ -226,7 +226,7 @@ while IFS= read -r skill; do
   [ "$(sed -n '1p' "$skill")" = --- ] || fail "$skill: no frontmatter"
   grep -qxF "name: $folder" "$skill" || fail "$skill: name isn't '$folder'"
   grep -qE '^description: .{40,}' "$skill" || fail "$skill: description missing or too short to trigger on"
-  for link in $(grep -oE '\]\([a-z-]+\.md\)' "$skill" | tr -d '])('); do
+  for link in $(grep -oE '\]\([a-z./-]+\.md\)' "$skill" | tr -d '])('); do
     [ -f "$(dirname "$skill")/$link" ] || fail "$skill: links to missing $link"
   done
 done < <(find "$here/core" "$here/stacks" -path '*/.claude/skills/*/SKILL.md')

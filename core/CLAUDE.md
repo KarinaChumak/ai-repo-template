@@ -21,7 +21,7 @@ These scripts are the entry points in this repo. Use them instead of calling the
 
 # Planning
 
-- `.claude/product.md` says what the product is for; `.claude/plan.md` holds the phases and the current phase's tickets. `/kickoff` creates both; `/plan-phase` breaks down the next phase.
+- `ai/product.md` says what the product is for; `ai/plan.md` holds the phases and the current phase's tickets. `/kickoff` creates both; `/plan-phase` breaks down the next phase.
 - A ticket is one behavior the user can see, with its UI, types, API, copy and tests in the same PR. PRs stay under 500 changed lines; a bigger ticket is split into PRs that are each a complete smaller behavior.
 
 # Conventions

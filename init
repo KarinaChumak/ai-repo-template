@@ -11,7 +11,7 @@ Usage: ./init [--stack <name>] [--mode solo|team] [--into <dir>] [--decisions-fi
   --stack           Which stack to set up. Asked interactively if omitted.
   --mode            solo (default) or team. Team adds CODEOWNERS.
   --into            Add the setup to an existing repo instead of turning this clone into the project.
-  --decisions-file  Where the decision log goes, relative to the repo root. Default: .claude/decisions.md
+  --decisions-file  Where the decision log goes, relative to the repo root. Default: ai/decisions.md
   --name            Project name for starter stacks. Defaults to the target folder name.
   --force           Overwrite files that already exist. Without it, existing files are kept and listed.
 
@@ -37,7 +37,7 @@ die() {
 [ -d "$here/core" ] && [ -d "$here/stacks" ] || die "run this from a clone of ai-repo-template."
 command -v jq >/dev/null || die "jq is required (brew install jq)."
 
-stack="" mode="" name="" into="" decisions=".claude/decisions.md" force=0
+stack="" mode="" name="" into="" decisions="ai/decisions.md" force=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --stack) stack=${2:?}; shift 2 ;;

@@ -1,6 +1,6 @@
 ---
 name: plan-phase
-description: Break the next phase in .claude/plan.md into tickets, each a behavior the user can see, delivered end to end in PRs under 500 lines. Use when a phase is nearly done, when kickoff plans Phase 1, or when the user runs /plan-phase.
+description: Break the next phase in ai/plan.md into tickets, each a behavior the user can see, delivered end to end in PRs under 500 lines. Use when a phase is nearly done, when kickoff plans Phase 1, or when the user runs /plan-phase.
 ---
 
 # Plan the next phase
@@ -9,7 +9,7 @@ Break down one phase only: the current one if it has no tickets yet, otherwise t
 
 ## 1. Read
 
-- `.claude/plan.md` (start from [plan-template.md](plan-template.md) if it doesn't exist), `.claude/product.md` and `__DECISIONS_FILE__`.
+- `ai/plan.md` (start from [plan-template.md](plan-template.md) if it doesn't exist), `ai/product.md` and `__DECISIONS_FILE__`.
 - What the finished tickets of the previous phase changed: their outcomes in `plan.md` and the merged code.
 - If what you learned changes a later phase's goal, propose the new goal to the user before planning.
 
@@ -35,7 +35,7 @@ Each ticket is one behavior a user can see, delivered end to end in the same PR:
 
 ## 5. Write the tickets
 
-In `.claude/plan.md`, under the phase, in the format of [plan-template.md](plan-template.md):
+In `ai/plan.md`, add a `## Phase N: <Name>` section after the previous phase's, with the lanes and then the tickets, in the format of [plan-template.md](plan-template.md):
 
 ```markdown
 ### T-04 Filter the dashboard by date range
@@ -54,7 +54,7 @@ In `.claude/plan.md`, under the phase, in the format of [plan-template.md](plan-
 
 - Ticket IDs keep counting across phases: T-01, T-02… never restart.
 - Every "done when" can be proved by a test or a screenshot.
-- Mark the phase `(current)` and remove the marker from the previous one.
+- In the `## Phases` list, mark this phase `(current)` and remove the marker from the previous one. Update its goal or exit there if planning changed them.
 
 ## 6. Report
 
