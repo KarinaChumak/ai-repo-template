@@ -211,7 +211,7 @@ settings_inputs=("$src_core/settings.json")
 jq -s "$merge_json" "${settings_inputs[@]}" >"$tmp/settings.json"
 
 if [ "$inplace" -eq 1 ]; then
-  for p in core stacks team tests init README.md CLAUDE.md; do
+  for p in core stacks team tests user init install-user README.md CLAUDE.md; do
     rm -rf "${here:?}/$p"
   done
 fi

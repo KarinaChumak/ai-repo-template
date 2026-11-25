@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# Installs the user-level part of ai-repo-template into ~/.claude: a personal profile and a block of
+# rules in ~/.claude/CLAUDE.md that apply in every repo. Must run on macOS's bash 3.2.
+set -euo pipefail
+
+here=$(cd "$(dirname "$0")" && pwd)
+start_marker='<!-- ai-repo-template:start -->'
+end_marker='<!-- ai-repo-template:end -->'
+
+usage() {
+  cat <<EOF
+Usage: ./install-user [--home <dir>] [--dry-run]
+
+  --home     Install into <dir>/.claude instead of \$HOME/.claude.
+  --dry-run  Print what would change without changing anything.
+
+Copies user/PROFILE.md to ~/.claude/PROFILE.md if that file doesn't exist, and adds
+user/CLAUDE.md.snippet to ~/.claude/CLAUDE.md between its markers. Running it again
+replaces only the text between the markers.
+EOF
+}
+
+die() {
+  echo "install-user: $*" >&2
+  exit 1
+}
+
+home=${HOME:-} dry=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --home) home=${2:?}; shift 2 ;;
+    --dry-run) dry=1; shift ;;
+    -h | --help) usage; exit 0 ;;
+    *) usage >&2; die "unknown option $1" ;;
+  esac
+done
+
+[ -n "$home" ] || die "HOME is not set; pass --home <dir>."
+[ -d "$home" ] || die "$home is not a directory."
+snippet=$here/user/CLAUDE.md.snippet
+profile_src=$here/user/PROFILE.md
+[ -f "$snippet" ] && [ -f "$profile_src" ] || die "run this from a clone of ai-repo-template."
+[ "$(grep -cxF "$start_marker" "$snippet")" = 1 ] && [ "$(grep -cxF "$end_marker" "$snippet")" = 1 ] ||
+  die "$snippet must hold one start and one end marker."
+
+dir=$home/.claude
+claude_md=$dir/CLAUDE.md
+profile=$dir/PROFILE.md
+# say "<what it did>" "<what it would do>"
+say() {
+  if [ "$dry" = 1 ]; then echo "Would $2"; else echo "$1"; fi
+}
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+if [ ! -d "$dir" ]; then
+  say "Created $dir/" "create $dir/"
+  [ "$dry" = 1 ] || mkdir -p "$dir"
+fi
+
+if [ -e "$profile" ]; then
+  echo "Kept $profile (already exists)."
+else
+  say "Copied user/PROFILE.md to $profile. Fill it in with how you like to work." "copy user/PROFILE.md to $profile."
+  [ "$dry" = 1 ] || cp "$profile_src" "$profile"
+fi
+
+# Build the new CLAUDE.md in $tmp/new. Everything outside the markers is copied byte for byte.
+new=$tmp/new
+if [ ! -e "$claude_md" ]; then
+  did="Created" would="create"; what="$claude_md with the ai-repo-template block"
+  cp "$snippet" "$new"
+else
+  starts=$(grep -cxF "$start_marker" "$claude_md" || true)
+  ends=$(grep -cxF "$end_marker" "$claude_md" || true)
+  if [ "$starts" = 0 ] && [ "$ends" = 0 ]; then
+    did="Appended" would="append"; what="the ai-repo-template block to $claude_md"
+    cp "$claude_md" "$new"
+    if [ -s "$new" ]; then
+      [ -z "$(tail -c 1 "$new")" ] || printf '\n' >>"$new"
+      printf '\n' >>"$new"
+    fi
+    cat "$snippet" >>"$new"
+  elif [ "$starts" = 1 ] && [ "$ends" = 1 ]; then
+    s=$(grep -nxF "$start_marker" "$claude_md" | cut -d: -f1)
+    e=$(grep -nxF "$end_marker" "$claude_md" | cut -d: -f1)
+    [ "$s" -lt "$e" ] || die "$claude_md has the end marker before the start marker. Fix it by hand."
+    did="Updated" would="update"; what="the ai-repo-template block in $claude_md"
+    : >"$new"
+    # macOS's head rejects -n 0, so only copy the lines above the block when there are some.
+    [ "$s" = 1 ] || head -n $((s - 1)) "$claude_md" >"$new"
+    cat "$snippet" >>"$new"
+    tail -n +$((e + 1)) "$claude_md" >>"$new"
+  else
+    die "$claude_md needs exactly one '$start_marker' line and one '$end_marker' line. Fix it by hand."
+  fi
+fi
+
+if [ -e "$claude_md" ] && cmp -s "$new" "$claude_md"; then
+  echo "Kept $claude_md (the ai-repo-template block is up to date)."
+else
+  say "$did $what." "$would $what:"
+  if [ "$dry" = 1 ]; then
+    if [ -e "$claude_md" ]; then diff -u "$claude_md" "$new" || true; else cat "$new"; fi
+  else
+    # Write through the existing file so a symlinked CLAUDE.md and its permissions are kept.
+    cat "$new" >"$claude_md"
+  fi
+fi
+
+[ "$dry" = 0 ] || echo "Dry run: nothing was changed."
