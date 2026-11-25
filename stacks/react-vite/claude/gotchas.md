@@ -1,0 +1,2 @@
+- Change dependencies with `pnpm add` / `pnpm remove`; `pnpm-lock.yaml` is protected from direct edits.
+- The lint, TypeScript, Vite and Playwright configs are protected, so a check can't be turned off to make it pass. Ask a human to change them.

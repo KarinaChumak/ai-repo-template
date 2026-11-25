@@ -1,0 +1,3 @@
+- Import from `@/…`, never with `../`.
+- Query elements in tests by role or label (`getByRole`), not by test id or class name.
+- Don't add `useMemo`, `useCallback` or `memo` for performance: React Compiler memoizes. Use them only when a value's identity matters to an effect.
