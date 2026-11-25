@@ -4,7 +4,10 @@ A Claude Code setup for new and existing repos, built for big, ambiguous project
 
 It's a point-in-time template, not a library. `init` writes the setup into a repo, and from then on that repo owns it and changes it freely. Nothing syncs back.
 
-The whole setup lives in `.claude/`, so it never mixes with your code.
+The setup lives in two folders, so it never mixes with your code:
+
+- **`.claude/`**: config and rules, edited rarely: `CLAUDE.md`, `REVIEW.md`, settings, hooks, skills, scripts. Claude Code asks before every edit here, which is what you want for rule files.
+- **`ai/`**: the files Claude updates all the time: `plan.md`, `product.md` and `decisions.md`. Edits here don't need a prompt, so planning and decisions work in unattended runs too.
 
 ## Start a new project
 
@@ -24,10 +27,12 @@ git clone https://github.com/<you>/ai-repo-template ~/Code/ai-repo-template
 ~/Code/ai-repo-template/init --stack none --into ~/Code/my-existing-repo
 ```
 
-- **Existing files are kept**, and the ones it skipped are listed. `--force` overwrites them.
+- **Existing files are kept, byte for byte.** When a file the setup would write is already there and differs, the generated version goes to `.claude/ai-setup-pending/` (gitignored), listed in `.claude/ai-setup-pending/MERGE.md` with the file to merge it into. Ask Claude to "merge the files listed in .claude/ai-setup-pending/MERGE.md". `--force` overwrites instead.
+- **`CLAUDE.md` and `REVIEW.md`** count as existing at the root or in `.claude/`, so a repo never ends up with two.
 - **`.claude/settings.json` is merged:** your permissions and hooks stay, and the template's are added.
 - **`.gitignore`, `.gitattributes`, `.worktreeinclude` and `.claude/protected-paths`** get the missing lines appended.
-- **If the repo already has a `CLAUDE.md` or `REVIEW.md`** (at the root or in `.claude/`), the generated versions go to `.claude/ai-setup-pending/`, and `init` prints a prompt to have Claude merge them.
+- **Apart from those appended lines and the merged settings, the repo's own files are never edited.** Placeholders like the project name are filled in before anything is written.
+- **Starter stacks:** `check` runs Prettier on the whole repo, including files that were there before. Format them, or list the ones that must stay as they are in `.prettierignore`.
 - **Running it again is safe:** nothing gets duplicated.
 
 ## Options
@@ -37,7 +42,7 @@ git clone https://github.com/<you>/ai-repo-template ~/Code/ai-repo-template
 | `--stack <name>` | asked | See the table below |
 | `--mode solo\|team` | `solo` | `team` adds `.github/CODEOWNERS` so `.claude/` and `.github/` always need a code owner's review |
 | `--into <dir>` | this clone | Add the setup to an existing repo |
-| `--decisions-file <path>` | `.claude/decisions.md` | Where the decision log goes, for a project that needs it somewhere else, such as `DECISIONS.md` |
+| `--decisions-file <path>` | `ai/decisions.md` | Where the decision log goes, for a project that needs it somewhere else, such as `DECISIONS.md` |
 | `--force` | off | Overwrite existing files |
 
 ## Stacks
@@ -64,7 +69,8 @@ A stack is either a **starter** (ships app code in `tree/`, for new projects) or
 | --- | --- |
 | `.claude/CLAUDE.md` | Commands, what "done" means, conventions, gotchas, and the `#` feedback rule |
 | `.claude/REVIEW.md` | What reviewers flag and skip, evidence rules, Important/Nit/Pre-existing tags |
-| `.claude/decisions.md` | Decisions that affect more than one ticket. Entries are only ever added, and git merges the file with the `union` driver so parallel branches never conflict |
+| `.claude/skills/kickoff`, `plan-phase` | `/kickoff` turns an idea into decisions, `ai/product.md` and a phased `ai/plan.md` with only Phase 1 broken into tickets. `/plan-phase` breaks down the next phase: behavior slices, PRs under 500 lines, parallel lanes |
+| `ai/decisions.md` | Decisions that affect more than one ticket. Entries are only ever added, and git merges the file with the `union` driver so parallel branches never conflict |
 | `.claude/scripts/` | `setup`, `check`, `test`, `fix`, `quick-check`: the only commands hooks, skills and CI call |
 | `.claude/settings.json` | Permissions (merging PRs is denied: a human merges), plus hooks: protect paths before edits, format after edits, `quick-check` before Claude stops |
 | `.claude/protected-paths` | Globs Claude may not edit. Starts with `.github/workflows/*` |

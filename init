@@ -11,7 +11,7 @@ Usage: ./init [--stack <name>] [--mode solo|team] [--into <dir>] [--decisions-fi
   --stack           Which stack to set up. Asked interactively if omitted.
   --mode            solo (default) or team. Team adds CODEOWNERS.
   --into            Add the setup to an existing repo instead of turning this clone into the project.
-  --decisions-file  Where the decision log goes, relative to the repo root. Default: .claude/decisions.md
+  --decisions-file  Where the decision log goes, relative to the repo root. Default: ai/decisions.md
   --name            Project name for starter stacks. Defaults to the target folder name.
   --force           Overwrite files that already exist. Without it, existing files are kept and listed.
 
@@ -37,7 +37,7 @@ die() {
 [ -d "$here/core" ] && [ -d "$here/stacks" ] || die "run this from a clone of ai-repo-template."
 command -v jq >/dev/null || die "jq is required (brew install jq)."
 
-stack="" mode="" name="" into="" decisions=".claude/decisions.md" force=0
+stack="" mode="" name="" into="" decisions="ai/decisions.md" force=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --stack) stack=${2:?}; shift 2 ;;
@@ -95,14 +95,39 @@ cp -R "$here/stacks/$stack" "$tmp/stack"
 src_core="$tmp/core"
 src_stack="$tmp/stack"
 
-created=()
-skipped=()
-pending=()
+# Fill in placeholders in the copy, before anything is placed, so files that were already in the
+# target are never touched. __PROJECT_NAME__ is the package slug; __PROJECT_TITLE__ is the name people
+# see, kept to characters that are safe in sed, HTML and JSX; __DECISIONS_FILE__ is the decision log.
+title=$(printf '%s' "$name" | tr -cd 'A-Za-z0-9 ._-')
+title=${title:-$slug}
+while IFS= read -r f; do
+  sed -i.bak "s/__PROJECT_NAME__/$slug/g; s/__PROJECT_TITLE__/$title/g; s|__DECISIONS_FILE__|$decisions|g" "$f" &&
+    rm -f "$f.bak"
+done < <(grep -rlE '__(PROJECT_NAME|PROJECT_TITLE|DECISIONS_FILE)__' "$tmp" 2>/dev/null || true)
 
+pending_dir="$target/.claude/ai-setup-pending"
+created=()
+pending=()
+pending_into=()
+
+# Puts the generated version of a file in .claude/ai-setup-pending/<name>, to be merged into <into>.
+set_aside() {
+  local src=$1 name=$2 into=$3
+  mkdir -p "$(dirname "$pending_dir/$name")"
+  cp -p "$src" "$pending_dir/$name"
+  pending+=("$name")
+  pending_into+=("$into")
+}
+
+# Writes src to rel in the target. A file that's already there and differs is kept, and the
+# generated version is set aside for merging, unless --force.
 place() {
   local src=$1 rel=$2 dest="$target/$2"
+  if [ -e "$dest" ] && cmp -s "$src" "$dest"; then
+    return
+  fi
   if [ -e "$dest" ] && [ "$force" -eq 0 ]; then
-    skipped+=("$rel")
+    set_aside "$src" "$rel" "$rel"
     return
   fi
   mkdir -p "$(dirname "$dest")"
@@ -202,9 +227,7 @@ for doc in CLAUDE.md REVIEW.md; do
   if [ -n "$have" ] && cmp -s "$tmp/$doc" "$target/$have"; then
     continue # already set up by an earlier run
   elif [ -n "$have" ] && [ "$force" -eq 0 ]; then
-    mkdir -p "$target/.claude/ai-setup-pending"
-    cp "$tmp/$doc" "$target/.claude/ai-setup-pending/$doc"
-    pending+=("$have")
+    set_aside "$tmp/$doc" "$doc" "$have"
   else
     place "$tmp/$doc" ".claude/$doc"
   fi
@@ -228,31 +251,39 @@ jq -n --arg stack "$stack" --arg mode "$mode" --arg commit "$template_commit" --
   '{template: "ai-repo-template", template_commit: $commit, stack: $stack, mode: $mode, decisions_file: $decisions, created: $date}' \
   >"$target/.claude/ai-setup.json"
 
-if [ "$KIND" = starter ]; then
-  # __PROJECT_NAME__ is the package slug; __PROJECT_TITLE__ is the name people see, kept to characters
-  # that are safe in sed, HTML and JSX.
-  title=$(printf '%s' "$name" | tr -cd 'A-Za-z0-9 ._-')
-  title=${title:-$slug}
-  while IFS= read -r f; do
-    sed -i.bak "s/__PROJECT_NAME__/$slug/g; s/__PROJECT_TITLE__/$title/g" "$f" && rm -f "$f.bak"
-  done < <(grep -rlE '__PROJECT_(NAME|TITLE)__' "$target" --exclude-dir=.git --exclude-dir=node_modules 2>/dev/null || true)
+if [ "${#pending[@]}" -gt 0 ]; then
+  {
+    echo "# Files to merge"
+    echo
+    echo "\`init\` found these files already in the repo and left them unchanged. The generated version of each is in this folder. Merge it into the existing file, keeping this repo's content and adding what the setup needs. Then delete this folder."
+    echo
+    echo "- \`package.json\`: add the missing scripts, dependencies and devDependencies, keep this repo's name, then run \`.claude/scripts/setup\`."
+    echo "- \`README.md\`: add how to run the project."
+    echo
+    echo "| Generated | Merge into |"
+    echo "| --- | --- |"
+    i=0
+    while [ "$i" -lt "${#pending[@]}" ]; do
+      echo "| \`.claude/ai-setup-pending/${pending[$i]}\` | \`${pending_into[$i]}\` |"
+      i=$((i + 1))
+    done
+  } >"$pending_dir/MERGE.md"
 fi
 
 echo
 echo "Set up '$stack' ($mode) in $target"
 echo "Written: ${#created[@]} files"
-if [ "${#skipped[@]}" -gt 0 ]; then
-  echo
-  echo "Kept existing files (rerun with --force to overwrite, or merge by hand):"
-  printf '  %s\n' "${skipped[@]}"
-fi
 if [ "${#pending[@]}" -gt 0 ]; then
   echo
-  echo "This repo already has ${pending[*]}. The generated versions are in .claude/ai-setup-pending/. Ask Claude:"
-  for have in "${pending[@]}"; do
-    echo "  merge .claude/ai-setup-pending/$(basename "$have") into $have, keeping this repo's content."
-  done
-  echo "  Then delete .claude/ai-setup-pending."
+  echo "Kept ${#pending[@]} existing files unchanged: ${pending_into[*]}"
+  echo "The generated versions are in .claude/ai-setup-pending/ (gitignored). Ask Claude:"
+  echo "  merge the files listed in .claude/ai-setup-pending/MERGE.md"
+  echo "Or rerun with --force to overwrite them."
+fi
+if [ "$inplace" -eq 0 ] && [ "$KIND" = starter ]; then
+  echo
+  echo "check runs Prettier on the whole repo, including files that were here before."
+  echo "Format them, or list the ones that must stay as they are in .prettierignore."
 fi
 echo
 echo "Next:"
