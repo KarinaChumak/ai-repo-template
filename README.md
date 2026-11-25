@@ -18,7 +18,7 @@ cd my-app
 git add -A && git commit -m "Add AI setup from ai-repo-template"
 ```
 
-`init` without flags asks for the stack and mode. In this mode it removes the template's own files (`init`, `core/`, `stacks/`, `team/`, `tests/`, this README), so the result is a plain project.
+`init` without flags asks for the stack and mode. In this mode it removes the template's own files (`init`, `install-user`, `core/`, `stacks/`, `team/`, `tests/`, `user/`, this README), so the result is a plain project.
 
 ## Add the setup to an existing repo
 
