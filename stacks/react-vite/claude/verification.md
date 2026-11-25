@@ -1,0 +1,1 @@
+- For UI changes, `/design-check` passes and `/verify-ui` shows the change rendering at mobile and desktop widths with no console errors.

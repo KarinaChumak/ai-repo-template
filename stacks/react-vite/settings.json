@@ -8,8 +8,12 @@
       "Bash(pnpm typecheck)",
       "Bash(pnpm build)",
       "Bash(pnpm exec vitest run *)",
-      "Bash(pnpm exec playwright *)"
+      "Bash(pnpm exec playwright *)",
+      "Bash(.claude/scripts/raw-styles)"
     ],
-    "ask": ["Bash(pnpm add *)", "Bash(pnpm remove *)"]
+    "ask": [
+      "Bash(pnpm add *)",
+      "Bash(pnpm remove *)"
+    ]
   }
 }

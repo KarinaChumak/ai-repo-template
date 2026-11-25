@@ -115,7 +115,16 @@ for stack_dir in "$here"/stacks/*/; do
       [ ! -e "$copy/$f" ] || fail "$label: template file $f left behind"
     done
     check_result "$copy" "$label" "$mode"
-    if grep -rqF __PROJECT_NAME__ "$copy" --exclude-dir=node_modules; then fail "$label: placeholder left"; fi
+    if [ -d "$stack_dir/tree" ]; then
+      while IFS= read -r f; do
+        [ -e "$copy/${f#"$stack_dir/tree/"}" ] || fail "$label: missing ${f#"$stack_dir/tree/"} from the stack"
+      done < <(find "$stack_dir/tree" -type f ! -name .DS_Store)
+    fi
+    if grep -rqE '__PROJECT_(NAME|TITLE)__' "$copy" --exclude-dir=node_modules; then fail "$label: placeholder left"; fi
+    if [ -f "$copy/index.html" ]; then
+      grep -qF '<title>My App</title>' "$copy/index.html" || fail "$label: page title isn't the project name 'My App'"
+      grep -qF '"name": "my-app"' "$copy/package.json" || fail "$label: package name isn't the slug 'my-app'"
+    fi
     check_stop_hook "$copy" "$label"
 
     label="$stack/$mode existing"
@@ -193,6 +202,11 @@ export function BadRef() {
   ref.current += 1;
   return <p>{ref.current}</p>;
 }"
+      printf '.x {\n  color: #ff0000;\n  padding: 13px;\n  border: 1px solid;\n}\n' >"$app/src/x.css"
+      raw=$(cd "$app" && .claude/scripts/raw-styles || true)
+      [ "$(printf '%s\n' "$raw" | grep -c .)" = 2 ] || fail "$label: raw-styles should flag the hex color and 13px, got: $raw"
+      rm "$app/src/x.css"
+      (cd "$app" && .claude/scripts/raw-styles >/dev/null) || fail "$label: raw-styles flagged the clean starter app"
       (cd "$app" && pnpm exec playwright install chromium >/dev/null && .claude/scripts/e2e >/dev/null) ||
         fail "$label: e2e failed"
     fi
