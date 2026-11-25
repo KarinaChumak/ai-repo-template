@@ -39,6 +39,6 @@ To change an earlier decision, add a new entry that says which one it supersedes
 
 1. Commit everything with a message that says what the user can now do.
 2. Draft the PR description in the format of `.github/pull_request_template.md`: the ticket ID and title under Why, how each "done when" was proved under Testing, the new decision entries under Decisions.
-3. Show the draft to the user. Push and open the PR when they say so. Never merge it, and don't turn on auto-merge.
+3. Show the draft to the user, then run the `/pre-pr` skill, which opens it as a draft PR and reviews it. Never merge it, and don't turn on auto-merge.
 
 After the PR is merged, the user (or you, when asked) runs `.claude/scripts/ticket remove <ID>` from the main checkout to delete the worktree.
