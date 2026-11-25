@@ -5,7 +5,7 @@
 #   .claude/scripts/ticket remove <ID>         remove the worktree after its PR is merged
 #
 # start prints key=value lines: path, branch, port, new (yes|no).
-# Base branch: $TICKET_BASE, default main (origin/main when a remote has it).
+# Base branch: $TICKET_BASE, default main; origin/main instead when it is ahead of the local main.
 set -euo pipefail
 
 die() {
@@ -50,7 +50,11 @@ start() {
       branch=$id${slug:+-$slug}
       git -C "$root" fetch -q origin "$base" 2>/dev/null || true
       local from=$base
-      git -C "$root" rev-parse -q --verify "origin/$base" >/dev/null && from="origin/$base"
+      # origin's copy when it's newer; the local one when it has commits that aren't pushed yet.
+      if git -C "$root" rev-parse -q --verify "origin/$base" >/dev/null &&
+        git -C "$root" merge-base --is-ancestor "$base" "origin/$base" 2>/dev/null; then
+        from="origin/$base"
+      fi
       git -C "$root" worktree add -q -b "$branch" "$dir" "$from"
     fi
     # Untracked files the app needs, such as .env, listed in .worktreeinclude.

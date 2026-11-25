@@ -35,7 +35,7 @@ check_result() {
     .claude/hooks/protect-paths.sh .claude/hooks/format.sh .claude/hooks/stop-check.sh .claude/hooks/ticket-context.sh \
     .claude/skills/kickoff/SKILL.md .claude/skills/plan-phase/SKILL.md .claude/skills/ticket/SKILL.md .claude/skills/wrap-up/SKILL.md \
     .claude/skills/pre-pr/SKILL.md .claude/skills/address-review/SKILL.md .claude/agents/reviewer.md .claude/pr-size-ignore \
-    .github/workflows/pr-size.yml \
+    .github/workflows/pr-size.yml .claude/WORKFLOW.md \
     .github/pull_request_template.md .gitignore .gitattributes .worktreeinclude "$decisions"; do
     [ -e "$dir/$f" ] || fail "$label: missing $f"
   done
@@ -241,11 +241,14 @@ run_init "$here/init" --stack none --into "$repo"
   echo 'SECRET=1' >.env
 ) || fail "ticket: setting up the repo failed"
 t1=$(cd "$repo" && "$bash_bin" .claude/scripts/ticket start T-01 "Sign In!") || fail "ticket: start T-01 failed"
+# A commit on main that isn't pushed yet: the next ticket starts from it, not from origin/main.
+(cd "$repo" && echo local >local.txt && git add local.txt && git -c user.name=t -c user.email=t@t commit -qm local)
 t2=$(cd "$repo" && "$bash_bin" .claude/scripts/ticket start T-02 dashboard) || fail "ticket: start T-02 failed"
 field() { printf '%s\n' "$1" | sed -n "s/^$2=//p"; }
 [ "$(field "$t1" path)" = "$repo/.claude/worktrees/T-01" ] || fail "ticket: T-01 path is $(field "$t1" path)"
 [ "$(field "$t1" branch)" = T-01-sign-in ] || fail "ticket: T-01 branch is $(field "$t1" branch)"
 [ "$(field "$t2" branch)" = T-02-dashboard ] || fail "ticket: T-02 branch is $(field "$t2" branch)"
+[ -f "$repo/.claude/worktrees/T-02/local.txt" ] || fail "ticket: T-02 didn't start from the local main that is ahead of origin"
 [ "$(field "$t1" port)" != "$(field "$t2" port)" ] || fail "ticket: both tickets got port $(field "$t1" port)"
 [ "$(field "$t1" new)" = yes ] || fail "ticket: first start of T-01 isn't new"
 [ "$(git -C "$repo" branch --show-current)" = main ] || fail "ticket: the main checkout left main"
@@ -265,7 +268,13 @@ printf '%s\n' "$ctx" | grep -qF '### T-010 Other' || fail "ticket: hook on branc
 (cd "$repo" && "$bash_bin" .claude/scripts/ticket remove T-01 >/dev/null) || fail "ticket: remove T-01 failed"
 [ ! -e "$repo/.claude/worktrees/T-01" ] || fail "ticket: remove left the worktree"
 if git -C "$repo" rev-parse -q --verify T-01-sign-in >/dev/null; then fail "ticket: remove kept the merged branch"; fi
+# A commit pushed from elsewhere: once origin/main is ahead, the next ticket starts from it.
+(
+  git clone -q "$origin" "$work/ticket-other" && cd "$work/ticket-other" && git pull -q "$repo" main &&
+    echo remote >remote.txt && git add remote.txt && git -c user.name=t -c user.email=t@t commit -qm remote && git push -q origin HEAD:main
+) || fail "ticket: pushing from another clone failed"
 t3=$(cd "$repo" && "$bash_bin" .claude/scripts/ticket start T-03) || fail "ticket: start T-03 failed"
+[ -f "$repo/.claude/worktrees/T-03/remote.txt" ] || fail "ticket: T-03 didn't start from origin/main when it was ahead"
 [ "$(field "$t3" port)" = "$(field "$t1" port)" ] || fail "ticket: T-03 didn't reuse the freed port"
 
 echo "== pr-size: counts the branch's lines, skips ignored files, fails over the limit"
