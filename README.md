@@ -24,10 +24,12 @@ git clone https://github.com/<you>/ai-repo-template ~/Code/ai-repo-template
 ~/Code/ai-repo-template/init --stack none --into ~/Code/my-existing-repo
 ```
 
-- **Existing files are kept**, and the ones it skipped are listed. `--force` overwrites them.
+- **Existing files are kept, byte for byte.** When a file the setup would write is already there and differs, the generated version goes to `.claude/ai-setup-pending/` (gitignored), listed in `.claude/ai-setup-pending/MERGE.md` with the file to merge it into. Ask Claude to "merge the files listed in .claude/ai-setup-pending/MERGE.md". `--force` overwrites instead.
+- **`CLAUDE.md` and `REVIEW.md`** count as existing at the root or in `.claude/`, so a repo never ends up with two.
 - **`.claude/settings.json` is merged:** your permissions and hooks stay, and the template's are added.
 - **`.gitignore`, `.gitattributes`, `.worktreeinclude` and `.claude/protected-paths`** get the missing lines appended.
-- **If the repo already has a `CLAUDE.md` or `REVIEW.md`** (at the root or in `.claude/`), the generated versions go to `.claude/ai-setup-pending/`, and `init` prints a prompt to have Claude merge them.
+- **Apart from those appended lines and the merged settings, the repo's own files are never edited.** Placeholders like the project name are filled in before anything is written.
+- **Starter stacks:** `check` runs Prettier on the whole repo, including files that were there before. Format them, or list the ones that must stay as they are in `.prettierignore`.
 - **Running it again is safe:** nothing gets duplicated.
 
 ## Options

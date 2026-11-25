@@ -95,6 +95,31 @@ check_union_merge() {
   grep -q 'T-01' "$dir/$decisions" && grep -q 'T-02' "$dir/$decisions" || fail "$label: union merge lost an entry"
 }
 
+# A repo someone else made: a brief, data files, and optionally its own package.json. The README
+# contains a placeholder on purpose: init must not fill in placeholders in the repo's own files.
+make_real_repo() {
+  local dir=$1 with_pkg=$2
+  mkdir -p "$dir/jobs"
+  git -C "$dir" init -q
+  printf '# The brief\n\nBuild the flow. Keep `__PROJECT_NAME__` as is.\n' >"$dir/README.md"
+  printf '{ "id": "short", "questions": [{ "id": "q1", "type": "boolean" }] }\n' >"$dir/jobs/short.json"
+  printf '{ "name": "Ada" }\n' >"$dir/profile.json"
+  if [ "$with_pkg" = 1 ]; then printf '{\n  "name": "their-task",\n  "private": true\n}\n' >"$dir/package.json"; fi
+}
+
+# Checksum of the repo's own files; package.json counts only if the repo had one.
+fixture_sums() {
+  local f files="README.md jobs/short.json profile.json"
+  [ "$2" = 0 ] || files="$files package.json"
+  for f in $files; do cat "$1/$f"; done | cksum
+}
+
+# A checksum of every file's path and content, outside .git and node_modules.
+tree_sum() {
+  (cd "$1" && find . \( -name .git -o -name node_modules \) -prune -o -type f -print | sort |
+    while IFS= read -r f; do printf '%s\n' "$f"; cat "$f"; done | cksum)
+}
+
 new_project() {
   local dest=$1
   mkdir -p "$dest"
@@ -157,6 +182,33 @@ for stack_dir in "$here"/stacks/*/; do
   check_result "$repo" "$label" solo DECISIONS.md
   [ ! -e "$repo/.claude/decisions.md" ] || fail "$label: also wrote .claude/decisions.md"
   check_union_merge "$repo" "$label" DECISIONS.md
+
+  for with_pkg in 0 1; do
+    label="$stack into a real repo (package.json: $with_pkg)"
+    echo "== $label"
+    repo="$work/real-$stack-$with_pkg"
+    make_real_repo "$repo" "$with_pkg"
+    before=$(fixture_sums "$repo" "$with_pkg")
+    run_init "$here/init" --stack "$stack" --into "$repo"
+    [ "$(fixture_sums "$repo" "$with_pkg")" = "$before" ] || fail "$label: the repo's own files changed"
+    check_result "$repo" "$label" solo
+    pending="$repo/.claude/ai-setup-pending"
+    if [ -f "$stack_dir/README.md.tpl" ]; then
+      [ -f "$pending/README.md" ] || fail "$label: generated README.md not set aside"
+      grep -qF '| `.claude/ai-setup-pending/README.md` | `README.md` |' "$pending/MERGE.md" 2>/dev/null ||
+        fail "$label: MERGE.md doesn't list README.md"
+    fi
+    if [ "$with_pkg" = 1 ] && [ -f "$stack_dir/tree/package.json" ]; then
+      [ -f "$pending/package.json" ] || fail "$label: generated package.json not set aside"
+      grep -qF '| `.claude/ai-setup-pending/package.json` | `package.json` |' "$pending/MERGE.md" 2>/dev/null ||
+        fail "$label: MERGE.md doesn't list package.json"
+    fi
+    [ -f "$stack_dir/README.md.tpl" ] || [ ! -e "$pending" ] || fail "$label: set files aside for no reason"
+    grep -qxF '.claude/ai-setup-pending/' "$repo/.gitignore" || fail "$label: pending folder isn't gitignored"
+    before=$(tree_sum "$repo")
+    run_init "$here/init" --stack "$stack" --into "$repo"
+    [ "$(tree_sum "$repo")" = "$before" ] || fail "$label: running init again changed files"
+  done
 done
 
 echo "== none: root holds only files other tools require"
@@ -194,6 +246,8 @@ if [ "$full" -eq 1 ]; then
       .claude/scripts/check >/dev/null
       .claude/scripts/quick-check >/dev/null
     ) || fail "$label: setup, check or quick-check failed on a fresh project"
+    (cd "$work/real-$stack-0" && .claude/scripts/setup --frozen-lockfile >/dev/null && .claude/scripts/check >/dev/null) ||
+      fail "$label: setup or check failed after init into a repo with its own README and data files"
     if [ "$stack" = react-vite ]; then
       expect_quick_check_fails "$app" "$label" src/bad-type.ts 'export const n: number = "x";'
       expect_quick_check_fails "$app" "$label" src/BadRef.tsx "import { useRef } from 'react';
