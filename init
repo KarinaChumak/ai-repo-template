@@ -6,13 +6,14 @@ here=$(cd "$(dirname "$0")" && pwd)
 
 usage() {
   cat <<EOF
-Usage: ./init [--stack <name>] [--mode solo|team] [--into <dir>] [--decisions-file <path>] [--name <project>] [--force]
+Usage: ./init [--stack <name>] [--mode solo|team] [--into <dir>] [--decisions-file <path>] [--name <project>] [--ci-review] [--force]
 
   --stack           Which stack to set up. Asked interactively if omitted.
   --mode            solo (default) or team. Team adds CODEOWNERS.
   --into            Add the setup to an existing repo instead of turning this clone into the project.
   --decisions-file  Where the decision log goes, relative to the repo root. Default: ai/decisions.md
   --name            Project name for starter stacks. Defaults to the target folder name.
+  --ci-review       Add .github/workflows/claude-review.yml: a Claude review when a PR is marked ready, and @claude in PR comments.
   --force           Overwrite files that already exist. Without it, existing files are kept and listed.
 
 Stacks:
@@ -37,7 +38,7 @@ die() {
 [ -d "$here/core" ] && [ -d "$here/stacks" ] || die "run this from a clone of ai-repo-template."
 command -v jq >/dev/null || die "jq is required (brew install jq)."
 
-stack="" mode="" name="" into="" decisions="ai/decisions.md" force=0
+stack="" mode="" name="" into="" decisions="ai/decisions.md" force=0 ci_review=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --stack) stack=${2:?}; shift 2 ;;
@@ -45,6 +46,7 @@ while [ $# -gt 0 ]; do
     --name) name=${2:?}; shift 2 ;;
     --into) into=${2:?}; shift 2 ;;
     --decisions-file) decisions=${2:?}; shift 2 ;;
+    --ci-review) ci_review=true; shift ;;
     --force) force=1; shift ;;
     -h | --help) usage; exit 0 ;;
     *) usage >&2; die "unknown option $1" ;;
@@ -234,6 +236,7 @@ for doc in CLAUDE.md REVIEW.md; do
 done
 place "$src_core/decisions.md" "$decisions"
 [ ! -f "$src_stack/README.md.tpl" ] || place "$src_stack/README.md.tpl" README.md
+[ "$ci_review" = false ] || place "$src_core/ci-review/claude-review.yml" .github/workflows/claude-review.yml
 
 mkdir -p "$target/.claude"
 if [ -f "$settings" ]; then created+=(".claude/settings.json (merged)"); else created+=(".claude/settings.json"); fi
@@ -243,12 +246,13 @@ append_missing_lines .claude/protected-paths "$src_core/protected-paths" "$src_s
 append_missing_lines .gitignore "$src_core/gitignore" "$src_stack/gitignore"
 append_missing_lines .gitattributes "$tmp/gitattributes"
 append_missing_lines .worktreeinclude "$src_core/worktreeinclude"
+append_missing_lines .claude/pr-size-ignore "$src_core/pr-size-ignore" "$src_stack/pr-size-ignore"
 
 chmod +x "$target"/.claude/scripts/* "$target"/.claude/hooks/*.sh 2>/dev/null || true
 
-jq -n --arg stack "$stack" --arg mode "$mode" --arg commit "$template_commit" --arg decisions "$decisions" \
+jq -n --arg stack "$stack" --arg mode "$mode" --arg commit "$template_commit" --arg decisions "$decisions" --argjson ci_review "$ci_review" \
   --arg date "$(date -u +%F)" \
-  '{template: "ai-repo-template", template_commit: $commit, stack: $stack, mode: $mode, decisions_file: $decisions, created: $date}' \
+  '{template: "ai-repo-template", template_commit: $commit, stack: $stack, mode: $mode, decisions_file: $decisions, ci_review: $ci_review, created: $date}' \
   >"$target/.claude/ai-setup.json"
 
 if [ "${#pending[@]}" -gt 0 ]; then
@@ -293,6 +297,10 @@ else
   echo "  Fill in .claude/scripts/ for this repo's tools, then run .claude/scripts/check."
 fi
 echo "  Fill in the Project section of .claude/CLAUDE.md, then commit."
+if [ "$ci_review" = true ]; then
+  echo "  For the Claude review on PRs: run /install-github-app in Claude Code, and add the ANTHROPIC_API_KEY"
+  echo "  or CLAUDE_CODE_OAUTH_TOKEN repository secret."
+fi
 if [ "$mode" = team ]; then
   echo "  Replace the teams in .github/CODEOWNERS and set up branch protection."
 fi

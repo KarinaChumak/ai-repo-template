@@ -38,4 +38,4 @@ In the ticket's section, set `Status: in progress` and `Branch: <branch>`. Commi
 
 ## 6. Finish
 
-When every "done when" holds, run the `/wrap-up` skill. Don't merge; a human does.
+When every "done when" holds, run the `/wrap-up` skill, then `/pre-pr`. When the user says the PR has comments, run `/address-review`. Don't merge; a human does.
