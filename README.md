@@ -87,6 +87,19 @@ Before Claude finishes a turn, `.claude/hooks/stop-check.sh` runs `.claude/scrip
 
 The template's own reviewers read `.claude/REVIEW.md`. If you use a review tool that only looks for `REVIEW.md` at the repo root, add a root `REVIEW.md` that points to `.claude/REVIEW.md`.
 
+## User-level setup
+
+Some rules belong to you, not to one repo: never merging pull requests, how you like to work. `install-user` puts them in `~/.claude/`, which Claude Code reads in every repo:
+
+```bash
+~/Code/ai-repo-template/install-user --dry-run
+~/Code/ai-repo-template/install-user
+```
+
+- **`~/.claude/PROFILE.md`**: a personal profile to fill in (conventions, review preferences, tone), copied from `user/PROFILE.md` only if you don't have one yet.
+- **`~/.claude/CLAUDE.md`**: gets the rules from `user/CLAUDE.md.snippet` between `<!-- ai-repo-template:start -->` and `<!-- ai-repo-template:end -->`. Running it again replaces only that block, so snippet updates apply cleanly. Everything outside the markers stays byte for byte.
+- `--dry-run` prints what would change. `--home <dir>` installs into `<dir>/.claude` instead of `~/.claude`.
+
 ## Working on the template
 
 - **Layout:** `core/` goes into every repo, `stacks/<name>/` holds what's specific to one stack, and `team/` holds the team-mode extras.
