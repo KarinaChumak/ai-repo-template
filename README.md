@@ -51,6 +51,8 @@ git clone https://github.com/<you>/ai-repo-template ~/Code/ai-repo-template
 
 - **`quick-check`** (run before Claude stops): an incremental typecheck of the whole project, plus ESLint on the files the branch changed. ESLint includes the React Compiler rules from `eslint-plugin-react-hooks`, so code the compiler can't handle, like reading a ref during render, blocks Claude until it's fixed.
 - **`check`** (and CI): format check, lint, typecheck, unit tests, build. CI also runs the Playwright e2e tests.
+- **UI skills:** `/design-check` checks the branch's UI changes against `.claude/DESIGN.md` (tokens, layout, states, accessibility, copy), with `.claude/scripts/raw-styles` flagging raw colors and pixel sizes. `/verify-ui` runs the app, screenshots the changed screens at mobile and desktop widths, and runs e2e. `/scaffold-component` creates a component with its test, following `src/components/Button/`.
+- **Path rules:** `.claude/rules/components.md` and `.claude/rules/tests.md` load only when Claude works on those files.
 - **Protected:** `pnpm-lock.yaml` and the ESLint, TypeScript, Vite and Playwright configs, so a check can't be switched off to make it pass.
 - **Versions:** TypeScript stays on 6.0 until `typescript-eslint` supports 7. Accessibility lint uses `eslint-plugin-jsx-a11y-x`, a fork of `eslint-plugin-jsx-a11y` that supports ESLint 10. pnpm 12 only installs versions older than its minimum release age, so a brand-new package version can't be added the day it's published.
 

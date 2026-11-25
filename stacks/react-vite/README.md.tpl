@@ -1,4 +1,4 @@
-# __PROJECT_NAME__
+# __PROJECT_TITLE__
 
 React 19 + TypeScript + Vite, with React Compiler.
 

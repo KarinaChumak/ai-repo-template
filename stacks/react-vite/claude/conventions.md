@@ -1,3 +1,5 @@
+- Components live in `src/components/<Name>/` with `<Name>.tsx`, `<Name>.test.tsx` and `index.ts`. Use `/scaffold-component` to create one.
+- UI follows `.claude/DESIGN.md`.
 - Import from `@/…`, never with `../`.
 - Query elements in tests by role or label (`getByRole`), not by test id or class name.
 - Don't add `useMemo`, `useCallback` or `memo` for performance: React Compiler memoizes. Use them only when a value's identity matters to an effect.

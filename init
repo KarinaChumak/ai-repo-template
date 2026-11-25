@@ -229,9 +229,13 @@ jq -n --arg stack "$stack" --arg mode "$mode" --arg commit "$template_commit" --
   >"$target/.claude/ai-setup.json"
 
 if [ "$KIND" = starter ]; then
+  # __PROJECT_NAME__ is the package slug; __PROJECT_TITLE__ is the name people see, kept to characters
+  # that are safe in sed, HTML and JSX.
+  title=$(printf '%s' "$name" | tr -cd 'A-Za-z0-9 ._-')
+  title=${title:-$slug}
   while IFS= read -r f; do
-    sed -i.bak "s/__PROJECT_NAME__/$slug/g" "$f" && rm -f "$f.bak"
-  done < <(grep -rlF __PROJECT_NAME__ "$target" --exclude-dir=.git --exclude-dir=node_modules 2>/dev/null || true)
+    sed -i.bak "s/__PROJECT_NAME__/$slug/g; s/__PROJECT_TITLE__/$title/g" "$f" && rm -f "$f.bak"
+  done < <(grep -rlE '__PROJECT_(NAME|TITLE)__' "$target" --exclude-dir=.git --exclude-dir=node_modules 2>/dev/null || true)
 fi
 
 echo
