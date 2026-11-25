@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.claude/scripts/e2e)",
+      "Bash(.claude/scripts/e2e *)",
+      "Bash(pnpm lint)",
+      "Bash(pnpm lint *)",
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm build)",
+      "Bash(pnpm exec vitest run *)",
+      "Bash(pnpm exec playwright *)"
+    ],
+    "ask": ["Bash(pnpm add *)", "Bash(pnpm remove *)"]
+  }
+}

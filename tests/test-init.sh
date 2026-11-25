@@ -3,8 +3,12 @@
 # Runs init with the same bash as this script, so `/bin/bash tests/test-init.sh` tests macOS's bash 3.2.
 set -euo pipefail
 
+# --full also installs, checks, builds and e2e-tests every starter stack, and checks that its
+# quick-check catches a type error and a React Compiler violation.
 here=$(cd "$(dirname "$0")/.." && pwd)
 bash_bin=${BASH:-bash}
+full=0
+[ "${1:-}" != "--full" ] || full=1
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -156,6 +160,44 @@ for bad in /abs.md ../up.md 'a b.md' dir/; do
     fail "accepted --decisions-file '$bad'"
   fi
 done
+
+# quick-check must fail with the given file added, and pass again once it's removed.
+expect_quick_check_fails() {
+  local app=$1 label=$2 file=$3 body=$4
+  printf '%s\n' "$body" >"$app/$file"
+  if (cd "$app" && .claude/scripts/quick-check >/dev/null 2>&1); then fail "$label: quick-check passed with $file"; fi
+  rm "$app/$file"
+}
+
+if [ "$full" -eq 1 ]; then
+  for stack_dir in "$here"/stacks/*/; do
+    stack=$(basename "$stack_dir")
+    [ -d "$stack_dir/tree" ] || continue
+    label="$stack full"
+    echo "== $label"
+    app="$work/new-$stack-solo/My App"
+    (
+      cd "$app"
+      git init -q -b main 2>/dev/null || { git init -q && git checkout -q -b main; }
+      git -c user.name=t -c user.email=t@t add -A
+      git -c user.name=t -c user.email=t@t commit -qm init
+      .claude/scripts/setup --frozen-lockfile >/dev/null
+      .claude/scripts/check >/dev/null
+      .claude/scripts/quick-check >/dev/null
+    ) || fail "$label: setup, check or quick-check failed on a fresh project"
+    if [ "$stack" = react-vite ]; then
+      expect_quick_check_fails "$app" "$label" src/bad-type.ts 'export const n: number = "x";'
+      expect_quick_check_fails "$app" "$label" src/BadRef.tsx "import { useRef } from 'react';
+export function BadRef() {
+  const ref = useRef(0);
+  ref.current += 1;
+  return <p>{ref.current}</p>;
+}"
+      (cd "$app" && pnpm exec playwright install chromium >/dev/null && .claude/scripts/e2e >/dev/null) ||
+        fail "$label: e2e failed"
+    fi
+  done
+fi
 
 echo
 if [ "$failures" -gt 0 ]; then

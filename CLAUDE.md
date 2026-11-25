@@ -5,6 +5,7 @@ The source of `ai-repo-template`. `init` renders `core/`, `stacks/<name>/` and `
 # Commands
 
 - Test every stack and mode on macOS's bash: /bin/bash tests/test-init.sh
+- Also install, check, build and e2e-test the starter stacks: /bin/bash tests/test-init.sh --full
 - Try one: ./init --stack <name> --into "$(mktemp -d)"
 
 # Conventions

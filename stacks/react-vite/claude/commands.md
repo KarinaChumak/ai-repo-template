@@ -1,0 +1,2 @@
+- Dev server: .claude/scripts/dev (http://localhost:5173, or `PORT`)
+- E2E: .claude/scripts/e2e (first run on a machine: pnpm exec playwright install chromium)

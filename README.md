@@ -45,6 +45,14 @@ git clone https://github.com/<you>/ai-repo-template ~/Code/ai-repo-template
 | Stack | Kind | Notes |
 | --- | --- | --- |
 | `none` | overlay | The AI setup only. `.claude/scripts/` are stubs: `check` and `test` fail until you fill them in |
+| `react-vite` | starter | React 19, TypeScript 6, Vite 8 with React Compiler, Vitest, Testing Library, Playwright (desktop and mobile), ESLint with the React Compiler and a11y rules, Prettier, GitHub Actions CI. Node 26, pnpm 12 |
+
+### react-vite
+
+- **`quick-check`** (run before Claude stops): an incremental typecheck of the whole project, plus ESLint on the files the branch changed. ESLint includes the React Compiler rules from `eslint-plugin-react-hooks`, so code the compiler can't handle, like reading a ref during render, blocks Claude until it's fixed.
+- **`check`** (and CI): format check, lint, typecheck, unit tests, build. CI also runs the Playwright e2e tests.
+- **Protected:** `pnpm-lock.yaml` and the ESLint, TypeScript, Vite and Playwright configs, so a check can't be switched off to make it pass.
+- **Versions:** TypeScript stays on 6.0 until `typescript-eslint` supports 7. Accessibility lint uses `eslint-plugin-jsx-a11y-x`, a fork of `eslint-plugin-jsx-a11y` that supports ESLint 10. pnpm 12 only installs versions older than its minimum release age, so a brand-new package version can't be added the day it's published.
 
 A stack is either a **starter** (ships app code in `tree/`, for new projects) or an **overlay** (no `tree/`: only the AI setup and scripts, for any repo).
 
@@ -75,5 +83,6 @@ The template's own reviewers read `.claude/REVIEW.md`. If you use a review tool 
 
 - **Layout:** `core/` goes into every repo, `stacks/<name>/` holds what's specific to one stack, and `team/` holds the team-mode extras.
 - **Tests:** `/bin/bash tests/test-init.sh` runs `init` for every stack and mode, as a new project and into an existing repo, on macOS's bash 3.2.
+  `--full` also installs, checks, builds and e2e-tests each starter stack.
 - **Adding a stack:** copy `stacks/none`, then edit `stack.conf`, `scripts/` and `claude/*.md`. Add `settings.json`, `protected-paths`, `gitignore` or `tree/` if the stack needs them. Run the tests.
 - **Picking up template improvements:** an existing repo doesn't get them automatically. Compare `.claude/ai-setup.json`'s `template_commit` with the template's history and copy over what you want.
