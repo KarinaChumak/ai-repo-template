@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Counts the lines this branch changes against its base, and fails over the limit.
 #
-#   .claude/scripts/pr-size [base]   base defaults to origin/main, or main without a remote
+#   .claude/scripts/pr-size [base]   base defaults to main, or origin/main when it is ahead
 #
 # Files matching a glob in .claude/pr-size-ignore don't count. A glob without a "/" matches the
 # file name in any folder. Uncommitted and untracked files count, so it can run before a commit.
@@ -13,7 +13,10 @@ limit=${PR_SIZE_LIMIT:-500}
 base=${1:-}
 if [ -z "$base" ]; then
   base=main
-  git rev-parse -q --verify origin/main >/dev/null && base=origin/main
+  # origin's copy when it's newer; the local one when it has commits that aren't pushed yet.
+  if git rev-parse -q --verify origin/main >/dev/null && git merge-base --is-ancestor main origin/main 2>/dev/null; then
+    base=origin/main
+  fi
 fi
 from=$(git merge-base "$base" HEAD)
 

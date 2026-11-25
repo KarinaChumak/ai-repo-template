@@ -297,6 +297,7 @@ else
   echo "  Fill in .claude/scripts/ for this repo's tools, then run .claude/scripts/check."
 fi
 echo "  Fill in the Project section of .claude/CLAUDE.md, then commit."
+echo "  Then read .claude/WORKFLOW.md for the loop, from /kickoff to the merge."
 if [ "$ci_review" = true ]; then
   echo "  For the Claude review on PRs: run /install-github-app in Claude Code, and add the ANTHROPIC_API_KEY"
   echo "  or CLAUDE_CODE_OAUTH_TOKEN repository secret."

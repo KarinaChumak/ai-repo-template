@@ -17,8 +17,9 @@ One ticket, one session, one worktree. The main checkout stays on `main`, so oth
 
 1. Run `.claude/scripts/ticket start <ID> <short-slug>`, with a slug of 2–4 words from the title. It prints `path`, `branch`, `port` and `new`.
 2. Call the EnterWorktree tool with that `path`, so the rest of the session works there.
-3. If `new=no`, this is a resumed ticket: read `git log --oneline main..HEAD` and `git status` to see where it stands, and carry on from there.
-4. The dev server and e2e tests in this worktree use `port`. Pass it on if you start anything else that listens.
+3. If `new=yes`, run `.claude/scripts/setup` there: a new worktree has no installed dependencies.
+4. If `new=no`, this is a resumed ticket: read `git log --oneline main..HEAD` and `git status` to see where it stands, and carry on from there.
+5. The dev server and e2e tests in this worktree use `port`. Pass it on if you start anything else that listens.
 
 ## 3. Read before proposing
 
