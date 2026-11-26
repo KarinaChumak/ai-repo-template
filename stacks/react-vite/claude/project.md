@@ -14,6 +14,6 @@ Non-goals: SSR, a global state library, CSS-in-JS. Ask before adding any of them
 Where code goes:
 
 - `src/components/<Name>/`: generic, styled building blocks (Button, Text, PageLayout, Alert). They own all the CSS and know nothing about the product.
-- `src/features/<area>/`: the product's components, queries and types for one area, named from the glossary. They compose `src/components/` and have no CSS.
+- `src/features/<area>/`: the product's components, queries and types for one area. They compose `src/components/` and have no CSS.
 - `src/pages/<Name>Page/`: one component per route. Pages compose features and components, with no CSS.
 - `src/app/`: routes, providers and the query client.
