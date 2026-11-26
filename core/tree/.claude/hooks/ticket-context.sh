@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # SessionStart: on a ticket branch (T-04 or T-04-some-slug), print that ticket's
-# section from ai/plan.md, so it is back in context after startup, resume and compaction.
+# section from the notes' plan.md, so it is back in context after startup, resume and compaction.
 set -euo pipefail
 cd "${CLAUDE_PROJECT_DIR:-.}"
-plan=ai/plan.md
+plan="__NOTES_DIR__/plan.md"
+plan=${plan/#\~/$HOME} # external notes live under ~/claude-notes
 [ -f "$plan" ] || exit 0
 branch=$(git branch --show-current 2>/dev/null || true)
 [ -n "$branch" ] || exit 0

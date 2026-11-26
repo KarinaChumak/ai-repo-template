@@ -35,7 +35,7 @@ jobs:
 
             Review this pull request. Follow .claude/REVIEW.md for what to flag, what to skip and how
             to write findings, and check it against .claude/CLAUDE.md and the decision log it names.
-            The ticket it implements is the section in ai/plan.md whose ID starts the branch name.
+            If the repo has claude-notes/plan.md, the ticket this implements is its section whose ID starts the branch name.
 
             Review the code and its security in the same pass: input reaching queries, HTML or a
             shell unescaped, missing auth checks, secrets in code, unsafe dependencies.

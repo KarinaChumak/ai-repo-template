@@ -19,8 +19,16 @@ fail() {
   failures=$((failures + 1))
 }
 
+# External notes go under this fake home, never the real ~/claude-notes.
+notes_home=$work/home
+mkdir -p "$notes_home"
 run_init() {
-  "$bash_bin" "$@" >/dev/null
+  HOME=$notes_home "$bash_bin" "$@" >/dev/null
+}
+
+# A path from ai-setup.json on disk: ~/ is the fake home, anything else is inside the repo.
+resolve() {
+  case "$2" in "~/"*) echo "$notes_home/${2#"~/"}" ;; *) echo "$1/$2" ;; esac
 }
 
 # Exit code of a hook given a JSON input.
@@ -30,16 +38,28 @@ hook_exit() {
 }
 
 check_result() {
-  local dir=$1 label=$2 mode=$3 decisions=${4:-ai/decisions.md} f
+  local dir=$1 label=$2 mode=$3 decisions f notes notes_dir
+  notes=$(jq -r .notes "$dir/.claude/ai-setup.json")
+  notes_dir=$(jq -r .notes_dir "$dir/.claude/ai-setup.json")
+  decisions=${4:-$notes_dir/decisions.md}
+  [ -f "$(resolve "$dir" "$decisions")" ] || fail "$label: no decision log at $decisions"
+  if [ "$notes" = external ]; then
+    [ "$notes_dir" = "~/claude-notes/$(basename "$dir" | tr -cd 'A-Za-z0-9._-')" ] || fail "$label: external notes at $notes_dir"
+    [ ! -e "$dir/claude-notes" ] || fail "$label: claude-notes/ in the repo with external notes"
+    jq -e --arg d "$notes_dir" '(.permissions.allow | index("Edit(\($d)/**)")) and (.permissions.additionalDirectories | index($d))' \
+      "$dir/.claude/settings.json" >/dev/null || fail "$label: settings don't let Claude edit $notes_dir"
+  else
+    [ "$notes_dir" = claude-notes ] || fail "$label: in-repo notes at $notes_dir"
+  fi
   for f in .claude/CLAUDE.md .claude/REVIEW.md .claude/settings.json .claude/protected-paths .claude/ai-setup.json \
     .claude/hooks/protect-paths.sh .claude/hooks/format.sh .claude/hooks/stop-check.sh .claude/hooks/ticket-context.sh \
     .claude/skills/kickoff/SKILL.md .claude/skills/plan-phase/SKILL.md .claude/skills/ticket/SKILL.md .claude/skills/wrap-up/SKILL.md \
     .claude/skills/pre-pr/SKILL.md .claude/skills/address-review/SKILL.md .claude/agents/reviewer.md .claude/pr-size-ignore \
     .github/workflows/pr-size.yml .claude/WORKFLOW.md \
-    .github/pull_request_template.md .gitignore .gitattributes .worktreeinclude "$decisions"; do
+    .github/pull_request_template.md .gitignore .worktreeinclude; do
     [ -e "$dir/$f" ] || fail "$label: missing $f"
   done
-  if grep -rlE '__(PROJECT_NAME|PROJECT_TITLE|DECISIONS_FILE)__' "$dir/.claude" >/dev/null 2>&1; then
+  if grep -rlE '__(PROJECT_NAME|PROJECT_TITLE|DECISIONS_FILE|NOTES_DIR)__' "$dir/.claude" >/dev/null 2>&1; then
     fail "$label: placeholder left in .claude/"
   fi
   [ ! -e "$dir/.github/workflows/claude-review.yml" ] || fail "$label: claude-review.yml without --ci-review"
@@ -54,7 +74,10 @@ check_result() {
   ! grep -q '@@STACK_\|__DECISIONS_FILE__' "$dir/.claude/CLAUDE.md" "$dir/.claude/REVIEW.md" ||
     fail "$label: unrendered placeholder"
   grep -qF "\`$decisions\`" "$dir/.claude/CLAUDE.md" || fail "$label: CLAUDE.md doesn't name $decisions"
-  grep -qxF "$decisions merge=union" "$dir/.gitattributes" || fail "$label: .gitattributes has no union merge for $decisions"
+  case "$decisions" in
+    "~/"*) [ ! -e "$dir/.gitattributes" ] || fail "$label: .gitattributes for a decision log outside the repo" ;;
+    *) grep -qxF "$decisions merge=union" "$dir/.gitattributes" || fail "$label: .gitattributes has no union merge for $decisions" ;;
+  esac
   jq -e '.hooks.Stop and .hooks.PreToolUse and .hooks.PostToolUse and (.permissions.deny | index("Bash(gh pr merge *)"))' \
     "$dir/.claude/settings.json" >/dev/null || fail "$label: settings.json incomplete"
   jq -e --arg d "$decisions" '.decisions_file == $d' "$dir/.claude/ai-setup.json" >/dev/null ||
@@ -142,7 +165,9 @@ for stack_dir in "$here"/stacks/*/; do
     echo "== $label"
     copy="$work/new-$stack-$mode/My App"
     new_project "$copy"
-    run_init "$copy/init" --stack "$stack" --mode "$mode"
+    notes=external
+    [ "$mode" = solo ] || notes=in-repo
+    run_init "$copy/init" --stack "$stack" --mode "$mode" --notes "$notes"
     for f in core stacks team tests init README.md CLAUDE.md; do
       # A starter stack ships its own README.md.
       [ "$f" = README.md ] && [ -f "$stack_dir/README.md.tpl" ] && continue
@@ -189,7 +214,7 @@ for stack_dir in "$here"/stacks/*/; do
   mkdir -p "$repo"
   run_init "$here/init" --stack "$stack" --into "$repo" --decisions-file DECISIONS.md
   check_result "$repo" "$label" solo DECISIONS.md
-  [ ! -e "$repo/ai/decisions.md" ] || fail "$label: also wrote ai/decisions.md"
+  [ ! -e "$notes_home/claude-notes/decisions-$stack/decisions.md" ] || fail "$label: also wrote decisions.md in the notes"
   check_union_merge "$repo" "$label" DECISIONS.md
 
   for with_pkg in 0 1; do
@@ -222,19 +247,21 @@ done
 
 echo "== none: root holds only files other tools require"
 root=$(cd "$work/new-none-solo/My App" && ls -A | sort | tr '\n' ' ')
-[ "$root" = ".claude .gitattributes .github .gitignore .worktreeinclude ai " ] || fail "none: unexpected files at root: $root"
+[ "$root" = ".claude .github .gitignore .worktreeinclude " ] || fail "none, external notes: unexpected files at root: $root"
+root=$(cd "$work/new-none-team/My App" && ls -A | sort | tr '\n' ' ')
+[ "$root" = ".claude .gitattributes .github .gitignore .worktreeinclude claude-notes " ] || fail "none, in-repo notes: unexpected files at root: $root"
 
 echo "== ticket: parallel tickets get their own worktree, branch and port"
 origin="$work/ticket-origin.git"
 repo="$work/ticket-repo"
 mkdir -p "$repo"
 repo=$(cd "$repo" && pwd -P)
-run_init "$here/init" --stack none --into "$repo"
+run_init "$here/init" --stack none --into "$repo" --notes in-repo
 (
   cd "$repo"
   git init -q -b main 2>/dev/null || { git init -q && git checkout -q -b main; }
-  mkdir -p ai
-  printf '# Plan\n\n## Phase 1: Skeleton\n\n### T-01 Sign in\n\n- Status: todo\n\n### T-010 Other\n\n- Status: todo\n\n### T-02 Dashboard\n\n- Status: todo\n\n## Notes\n\nnot a ticket\n' >ai/plan.md
+  mkdir -p claude-notes
+  printf '# Plan\n\n## Phase 1: Skeleton\n\n### T-01 Sign in\n\n- Status: todo\n\n### T-010 Other\n\n- Status: todo\n\n### T-02 Dashboard\n\n- Status: todo\n\n## Notes\n\nnot a ticket\n' >claude-notes/plan.md
   git -c user.name=t -c user.email=t@t add -A
   git -c user.name=t -c user.email=t@t commit -qm init
   git clone -q --bare . "$origin" && git remote add origin "$origin" && git fetch -q origin
@@ -277,6 +304,20 @@ t3=$(cd "$repo" && "$bash_bin" .claude/scripts/ticket start T-03) || fail "ticke
 [ -f "$repo/.claude/worktrees/T-03/remote.txt" ] || fail "ticket: T-03 didn't start from origin/main when it was ahead"
 [ "$(field "$t3" port)" = "$(field "$t1" port)" ] || fail "ticket: T-03 didn't reuse the freed port"
 
+echo "== external notes: the hook reads them, and running init again keeps them"
+repo="$work/ext-repo"
+mkdir -p "$repo"
+run_init "$here/init" --stack none --into "$repo"
+notes="$notes_home/claude-notes/ext-repo"
+printf '\n## T-01: Kept\nA decision.\n' >>"$notes/decisions.md"
+printf '# Plan\n\n### T-07 Export a report\n\n- Status: todo\n' >"$notes/plan.md"
+run_init "$here/init" --stack none --into "$repo"
+grep -qF '## T-01: Kept' "$notes/decisions.md" || fail "external notes: running init again replaced the decision log"
+(cd "$repo" && git init -q && git checkout -q -b T-07-report)
+ctx=$(HOME=$notes_home CLAUDE_PROJECT_DIR=$repo "$bash_bin" "$repo/.claude/hooks/ticket-context.sh")
+printf '%s\n' "$ctx" | grep -qF '### T-07 Export a report' || fail "external notes: the hook didn't print T-07 from ~/claude-notes: $ctx"
+if "$bash_bin" "$here/init" --stack none --into "$repo" --notes elsewhere >/dev/null 2>&1; then fail "accepted --notes elsewhere"; fi
+
 echo "== pr-size: counts the branch's lines, skips ignored files, fails over the limit"
 repo="$work/size-repo"
 mkdir -p "$repo"
@@ -290,11 +331,11 @@ size() { (cd "$repo" && PR_SIZE_LIMIT=${limit:-500} "$bash_bin" .claude/scripts/
   git -c user.name=t -c user.email=t@t add -A
   git -c user.name=t -c user.email=t@t commit -qm init
   git checkout -qb T-01-size
-  mkdir -p src/generated/deep ai
+  mkdir -p src/generated/deep claude-notes
   lines 300 >src/a.ts
   lines 2000 >pnpm-lock.yaml
   lines 900 >src/generated/deep/api.ts
-  lines 100 >ai/plan.md
+  lines 100 >claude-notes/plan.md
   git -c user.name=t -c user.email=t@t add -A
   git -c user.name=t -c user.email=t@t commit -qm a
 ) || fail "pr-size: setting up the repo failed"
