@@ -53,8 +53,8 @@ check_result() {
   fi
   for f in .claude/CLAUDE.md .claude/REVIEW.md .claude/settings.json .claude/protected-paths .claude/ai-setup.json \
     .claude/hooks/protect-paths.sh .claude/hooks/format.sh .claude/hooks/stop-check.sh .claude/hooks/ticket-context.sh \
-    .claude/skills/kickoff/SKILL.md .claude/skills/plan-phase/SKILL.md .claude/skills/ticket/SKILL.md .claude/skills/wrap-up/SKILL.md \
-    .claude/skills/pre-pr/SKILL.md .claude/skills/address-review/SKILL.md .claude/agents/reviewer.md .claude/pr-size-ignore \
+    .claude/skills/kickoff/SKILL.md .claude/skills/plan-phase/SKILL.md .claude/skills/ticket/SKILL.md .claude/skills/finish/SKILL.md \
+    .claude/skills/address-review/SKILL.md .claude/agents/reviewer.md .claude/pr-size-ignore \
     .github/workflows/pr-size.yml .claude/WORKFLOW.md \
     .github/pull_request_template.md .gitignore .worktreeinclude; do
     [ -e "$dir/$f" ] || fail "$label: missing $f"
@@ -80,6 +80,10 @@ check_result() {
   esac
   jq -e '.hooks.Stop and .hooks.PreToolUse and .hooks.PostToolUse and (.permissions.deny | index("Bash(gh pr merge *)"))' \
     "$dir/.claude/settings.json" >/dev/null || fail "$label: settings.json incomplete"
+  jq -e '(.permissions.allow | index("Bash(git push -u origin *)") and index("Bash(gh pr create *)"))
+    and (.permissions.deny | index("Bash(git push * main)") and index("Bash(git push *--force*)"))
+    and ((.permissions.ask // []) | index("Bash(git push *)") | not)' \
+    "$dir/.claude/settings.json" >/dev/null || fail "$label: Claude can't push its branch and open the PR on its own, or can push to main"
   jq -e --arg d "$decisions" '.decisions_file == $d' "$dir/.claude/ai-setup.json" >/dev/null ||
     fail "$label: ai-setup.json doesn't record the decisions file"
   if [ "$mode" = team ]; then

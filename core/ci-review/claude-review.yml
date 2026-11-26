@@ -1,12 +1,12 @@
 name: Claude review
 
-# Reviews a PR when it's marked ready, and answers @claude in PR comments.
+# Reviews a PR when it's opened or marked ready, and answers @claude in PR comments.
 # Needs one repository secret: ANTHROPIC_API_KEY, or CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`.
 # The Claude GitHub app must be installed on the repo: run /install-github-app in Claude Code.
 
 on:
   pull_request:
-    types: [ready_for_review]
+    types: [opened, ready_for_review]
   issue_comment:
     types: [created]
   pull_request_review_comment:
