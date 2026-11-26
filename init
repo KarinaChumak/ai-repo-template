@@ -18,7 +18,8 @@ Usage: ./init [--stack <name>] [--mode solo|team] [--into <dir>] [--notes extern
   --ci-review       Add .github/workflows/claude-review.yml: a Claude review when a PR is marked ready, and @claude in PR comments.
   --no-pr           Leave the files uncommitted. By default, in a clean checkout of a GitHub repo, init commits them
                     on the ai-repo-setup branch and opens a PR called "AI repo setup".
-  --protect-main    Also require PRs for the default branch, admins included. This is the default for a new
+  --protect-main    Also require PRs for the default branch, admins included, and delete branches once their
+                    PR is merged. This is the default for a new
                     project (without --into); an existing repo keeps its settings unless you pass this.
   --force           Overwrite files that already exist. Without it, existing files are kept and listed.
 
@@ -380,6 +381,10 @@ if [ "$protect" -eq 1 ] && [ -n "$slug_gh" ] && command -v "$GH" >/dev/null; the
   if printf '%s' '{"required_status_checks":null,"enforce_admins":true,"required_pull_request_reviews":{"required_approving_review_count":0},"restrictions":null}' |
     "$GH" api -X PUT "repos/$slug_gh/branches/$default_branch/protection" --input - >/dev/null; then
     protect_note="Protected $default_branch on GitHub: changes land through PRs, admins included."
+    # A merged PR's branch is deleted, so nothing is left behind pointing at it.
+    if "$GH" api -X PATCH "repos/$slug_gh" -F delete_branch_on_merge=true >/dev/null; then
+      protect_note="$protect_note Merged branches are deleted."
+    fi
   else
     protect_note="Couldn't protect $default_branch: a private repo needs GitHub Pro or Team for branch protection, and you need admin rights."
   fi

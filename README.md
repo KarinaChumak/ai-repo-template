@@ -19,7 +19,7 @@ cd my-app
 
 `init` without flags asks for the stack and mode. In this mode it removes the template's own files (`init`, `install-user`, `core/`, `stacks/`, `team/`, `tests/`, `user/`, this README), so the result is a plain project.
 
-Then `init` commits the result on the `ai-repo-setup` branch, pushes it and opens a PR called "AI repo setup", so the setup lands like any other change. For a new project it also protects `main` on GitHub: changes land through PRs, admins included, with no approvals required. A private repo needs GitHub Pro or Team for that; `init` says so when GitHub refuses.
+Then `init` commits the result on the `ai-repo-setup` branch, pushes it and opens a PR called "AI repo setup", so the setup lands like any other change. For a new project it also protects `main` on GitHub: changes land through PRs, admins included, with no approvals required, and turns on deleting a PR's branch once it's merged. A private repo needs GitHub Pro or Team for that; `init` says so when GitHub refuses.
 
 ## Add the setup to an existing repo
 
@@ -48,7 +48,7 @@ git clone https://github.com/<you>/ai-repo-template ~/Code/ai-repo-template
 | `--decisions-file <path>` | `decisions.md` in the notes | Where the decision log goes, for a project that needs it somewhere else, such as `DECISIONS.md` |
 | `--ci-review` | off | Add `.github/workflows/claude-review.yml`: Claude reviews a PR (code and security, one pass) when it's marked ready, and answers `@claude` in PR comments. Needs the Claude GitHub app (`/install-github-app`) and an `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` secret |
 | `--no-pr` | off | Leave the files uncommitted instead of opening the "AI repo setup" PR |
-| `--protect-main` | on for a new project | Require PRs for the default branch on GitHub, admins included |
+| `--protect-main` | on for a new project | Require PRs for the default branch on GitHub, admins included, and delete branches once their PR is merged |
 | `--force` | off | Overwrite existing files |
 
 ## Stacks

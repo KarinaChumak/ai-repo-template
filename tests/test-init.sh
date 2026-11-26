@@ -448,7 +448,7 @@ git -C "$bare" ls-tree -r --name-only ai-repo-setup | grep -qxF .claude/CLAUDE.m
 [ "$(git -C "$bare" log -1 --format=%s ai-repo-setup)" = "AI repo setup" ] || fail "setup PR: commit message isn't 'AI repo setup'"
 [ "$(git -C "$bare" rev-parse main)" = "$(git -C "$repo" rev-parse main)" ] || fail "setup PR: main changed"
 grep -qF 'pr create -R me/task --base main --head ai-repo-setup --title AI repo setup' "$gh_log" || fail "setup PR: no gh pr create: $(cat "$gh_log")"
-if grep -q protection "$gh_log"; then fail "setup PR: protected main of an existing repo without --protect-main"; fi
+if grep -q 'protection\|delete_branch' "$gh_log"; then fail "setup PR: changed an existing repo's settings without --protect-main"; fi
 run_init "$here/init" --stack none --into "$repo" || fail "setup PR: second run failed"
 [ "$(grep -c 'pr create' "$gh_log")" = 1 ] || fail "setup PR: second run opened another PR"
 
@@ -482,6 +482,7 @@ if git -C "$work/pr-new.git" ls-tree -r --name-only ai-repo-setup | grep -qE '^(
 fi
 grep -qF 'pr create -R me/task' "$gh_log" || fail "setup PR, new: no PR"
 grep -qF 'branches/main/protection' "$gh_log" || fail "setup PR, new: main not protected"
+grep -qF 'api -X PATCH repos/me/task -F delete_branch_on_merge=true' "$gh_log" || fail "setup PR, new: merged branches aren't deleted: $(cat "$gh_log")"
 
 if [ "$full" -eq 1 ]; then
   for stack_dir in "$here"/stacks/*/; do
