@@ -31,6 +31,7 @@ git clone https://github.com/<you>/ai-repo-template ~/Code/ai-repo-template
 - **`CLAUDE.md` and `REVIEW.md`** count as existing at the root or in `.claude/`, so a repo never ends up with two.
 - **`.claude/settings.json` is merged:** your permissions and hooks stay, and the template's are added.
 - **`.gitignore`, `.gitattributes`, `.worktreeinclude` and `.claude/protected-paths`** get the missing lines appended.
+- **`gh` is pinned to `origin`**, so PRs never open in an `upstream` remote such as the company repo of a take-home task. A default you already chose with `gh repo set-default` is kept. `ticket start` does the same for repos set up before this.
 - **Apart from those appended lines and the merged settings, the repo's own files are never edited.** Placeholders like the project name are filled in before anything is written.
 - **Starter stacks:** `check` runs Prettier on the whole repo, including files that were there before. Format them, or list the ones that must stay as they are in `.prettierignore`.
 - **Running it again is safe:** nothing gets duplicated.

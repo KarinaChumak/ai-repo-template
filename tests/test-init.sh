@@ -308,6 +308,28 @@ t3=$(cd "$repo" && "$bash_bin" .claude/scripts/ticket start T-03) || fail "ticke
 [ -f "$repo/.claude/worktrees/T-03/remote.txt" ] || fail "ticket: T-03 didn't start from origin/main when it was ahead"
 [ "$(field "$t3" port)" = "$(field "$t1" port)" ] || fail "ticket: T-03 didn't reuse the freed port"
 
+echo "== gh opens PRs in origin, not in an upstream remote"
+repo="$work/gh-repo"
+mkdir -p "$repo"
+git -C "$repo" init -q
+git -C "$repo" remote add origin https://github.com/me/task.git
+git -C "$repo" remote add upstream https://github.com/company/task.git
+run_init "$here/init" --stack none --into "$repo"
+[ "$(git -C "$repo" config remote.origin.gh-resolved)" = base ] || fail "gh: init didn't pin gh to origin"
+[ -z "$(git -C "$repo" config remote.upstream.gh-resolved)" ] || fail "gh: init pinned gh to upstream"
+repo="$work/gh-chosen"
+mkdir -p "$repo"
+git -C "$repo" init -q
+git -C "$repo" remote add origin https://github.com/me/task.git
+git -C "$repo" remote add upstream https://github.com/company/task.git
+git -C "$repo" config remote.upstream.gh-resolved base
+run_init "$here/init" --stack none --into "$repo"
+[ -z "$(git -C "$repo" config remote.origin.gh-resolved)" ] || fail "gh: init overrode a default chosen with gh repo set-default"
+# A repo set up before the fix gets it from ticket start.
+git -C "$work/ticket-repo" config --unset remote.origin.gh-resolved 2>/dev/null || true
+(cd "$work/ticket-repo" && "$bash_bin" .claude/scripts/ticket start T-05 >/dev/null) || fail "gh: ticket start T-05 failed"
+[ "$(git -C "$work/ticket-repo" config remote.origin.gh-resolved)" = base ] || fail "gh: ticket start didn't pin gh to origin"
+
 echo "== external notes: the hook reads them, and running init again keeps them"
 repo="$work/ext-repo"
 mkdir -p "$repo"
