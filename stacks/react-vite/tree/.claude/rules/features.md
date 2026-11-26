@@ -4,7 +4,6 @@ paths:
   - 'src/pages/**'
 ---
 
-- Name files, components and hooks after the glossary in `__NOTES_DIR__/product.md`.
 - Compose components from `src/components/`. No HTML elements, CSS or `className` here; ESLint enforces it. A missing look is a new prop or component in `src/components/`.
 - Queries for an area live in its `queries.ts`. The hook returns the `useQuery` result unchanged:
 
