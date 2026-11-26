@@ -15,10 +15,11 @@ The setup lives in two places, so it never mixes with your code:
 gh repo create my-app --private --template <you>/ai-repo-template --clone
 cd my-app
 ./init --stack none
-git add -A && git commit -m "Add AI setup from ai-repo-template"
 ```
 
 `init` without flags asks for the stack and mode. In this mode it removes the template's own files (`init`, `install-user`, `core/`, `stacks/`, `team/`, `tests/`, `user/`, this README), so the result is a plain project.
+
+Then `init` commits the result on the `ai-repo-setup` branch, pushes it and opens a PR called "AI repo setup", so the setup lands like any other change. For a new project it also protects `main` on GitHub: changes land through PRs, admins included, with no approvals required. A private repo needs GitHub Pro or Team for that; `init` says so when GitHub refuses.
 
 ## Add the setup to an existing repo
 
@@ -33,6 +34,7 @@ git clone https://github.com/<you>/ai-repo-template ~/Code/ai-repo-template
 - **`.gitignore`, `.gitattributes`, `.worktreeinclude` and `.claude/protected-paths`** get the missing lines appended.
 - **Apart from those appended lines and the merged settings, the repo's own files are never edited.** Placeholders like the project name are filled in before anything is written.
 - **Starter stacks:** `check` runs Prettier on the whole repo, including files that were there before. Format them, or list the ones that must stay as they are in `.prettierignore`.
+- **The setup arrives as a PR** called "AI repo setup", on the `ai-repo-setup` branch, when the repo is on GitHub, `gh` is installed and there were no uncommitted changes. Otherwise `init` says why and leaves the files for you to commit, so your own changes never end up in its commit. Branch protection stays as it is unless you pass `--protect-main`.
 - **Running it again is safe:** nothing gets duplicated.
 
 ## Options
@@ -45,6 +47,8 @@ git clone https://github.com/<you>/ai-repo-template ~/Code/ai-repo-template
 | `--notes external\|in-repo` | `external` | Where the notes live: `~/claude-notes/<repo>/` (never committed) or `claude-notes/` in the repo (committed) |
 | `--decisions-file <path>` | `decisions.md` in the notes | Where the decision log goes, for a project that needs it somewhere else, such as `DECISIONS.md` |
 | `--ci-review` | off | Add `.github/workflows/claude-review.yml`: Claude reviews a PR (code and security, one pass) when it's marked ready, and answers `@claude` in PR comments. Needs the Claude GitHub app (`/install-github-app`) and an `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` secret |
+| `--no-pr` | off | Leave the files uncommitted instead of opening the "AI repo setup" PR |
+| `--protect-main` | on for a new project | Require PRs for the default branch on GitHub, admins included |
 | `--force` | off | Overwrite existing files |
 
 ## Stacks
