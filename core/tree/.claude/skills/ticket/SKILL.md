@@ -39,4 +39,6 @@ In the ticket's section, set `Status: in progress` and `Branch: <branch>`. If th
 
 ## 6. Finish
 
-When every "done when" holds, run the `/wrap-up` skill, then `/pre-pr`. When the user says the PR has comments, run `/address-review`. Don't merge; a human does.
+When every "done when" holds, run the `finish` skill right away, without waiting to be asked. It has a separate agent review the branch, fixes what it finds, and opens the PR.
+
+When the user says the PR has comments, run the `address-review` skill. Don't merge; a human does.

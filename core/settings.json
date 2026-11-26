@@ -11,10 +11,24 @@
       "Bash(git status)",
       "Bash(git diff *)",
       "Bash(git log *)",
-      "Bash(.claude/scripts/ticket *)"
+      "Bash(.claude/scripts/ticket *)",
+      "Bash(git push -u origin *)",
+      "Bash(git push origin *)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr edit *)",
+      "Bash(gh pr view *)"
     ],
-    "ask": ["Bash(git push *)"],
-    "deny": ["Bash(gh pr merge *)", "Read(./.env)", "Read(./.env.*)", "Read(./secrets/**)"]
+    "deny": [
+      "Bash(gh pr merge *)",
+      "Bash(git push * main)",
+      "Bash(git push *:main)",
+      "Bash(git push *--force*)",
+      "Bash(git push * -f *)",
+      "Bash(git push -f *)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)"
+    ]
   },
   "hooks": {
     "SessionStart": [

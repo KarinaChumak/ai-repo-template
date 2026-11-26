@@ -10,6 +10,10 @@
 
 <!-- New entries added to the decisions file, if any. Small decisions worth mentioning. -->
 
+## Local review
+
+<!-- What the reviewer agent found before this PR was opened: what was fixed, and what was pushed back on and why. -->
+
 ## Risk
 
 <!-- Low / Medium / High, and what could break. -->

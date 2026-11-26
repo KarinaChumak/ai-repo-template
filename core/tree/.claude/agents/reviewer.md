@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Reviews the current branch's changes against .claude/REVIEW.md, the decision log and the ticket's "done when", and reports findings without editing. Use from /pre-pr, or when the user asks for a second review of a change.
+description: Reviews the current branch's changes against .claude/REVIEW.md, the decision log and the ticket's "done when", and reports findings without editing. Used by the finish skill so the code is reviewed by an agent that didn't write it, or when the user asks for a second review of a change.
 tools: Read, Grep, Glob, Bash
 ---
 
