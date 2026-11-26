@@ -1,13 +1,21 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { App } from '@/App';
+import { createBrowserRouter, RouterProvider } from 'react-router';
+import { AppProviders } from '@/app/AppProviders';
+import { createQueryClient } from '@/app/queryClient';
+import { routes } from '@/app/routes';
 import './index.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root element');
 
+const queryClient = createQueryClient();
+const router = createBrowserRouter(routes);
+
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <AppProviders queryClient={queryClient}>
+      <RouterProvider router={router} />
+    </AppProviders>
   </StrictMode>,
 );

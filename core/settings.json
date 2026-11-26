@@ -27,7 +27,17 @@
       "Bash(git push -f *)",
       "Read(./.env)",
       "Read(./.env.*)",
-      "Read(./secrets/**)"
+      "Read(./secrets/**)",
+      "Bash(python - *)",
+      "Bash(python -c *)",
+      "Bash(python3 - *)",
+      "Bash(python3 -c *)",
+      "Bash(perl -e *)",
+      "Bash(perl -i *)",
+      "Bash(perl -pi *)",
+      "Bash(perl -0pi *)",
+      "Bash(node -e *)",
+      "Bash(sed -i *)"
     ]
   },
   "hooks": {

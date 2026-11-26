@@ -9,11 +9,11 @@
       "Bash(pnpm build)",
       "Bash(pnpm exec vitest run *)",
       "Bash(pnpm exec playwright *)",
-      "Bash(.claude/scripts/raw-styles)"
-    ],
-    "ask": [
       "Bash(pnpm add *)",
-      "Bash(pnpm remove *)"
+      "Bash(pnpm remove *)",
+      "Bash(pnpm install)",
+      "Bash(pnpm install *)",
+      "Bash(.claude/scripts/raw-styles)"
     ]
   }
 }

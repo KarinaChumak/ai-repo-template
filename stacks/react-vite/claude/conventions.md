@@ -1,4 +1,8 @@
-- Components live in `src/components/<Name>/` with `<Name>.tsx`, `<Name>.test.tsx` and `index.ts`. Use `/scaffold-component` to create one.
+- Components live in `src/components/<Name>/` with `<Name>.tsx`, `<Name>.css`, `<Name>.test.tsx` and `index.ts`. Use `/scaffold-component` to create one.
+- Pages and features render only components, never HTML elements, and have no CSS or `className`. When a page needs a look that no component has, add or extend a component in `src/components/`. ESLint enforces this.
+- Components in `src/components/` are generic: their names and props use UI words (`hint`, `tone`, `label`), never product words. Name them as design systems do: Alert, not Notice; Text, not Paragraph.
+- Fetch server data with TanStack Query. Each area keeps its queries in `src/features/<area>/queries.ts`: a `queryOptions` per resource, and a `use<Thing>Query` hook that returns the `useQuery` result as it is. Don't map it to a status type of your own; components read `isPending`, `error` and `data`.
+- Read URL parameters with React Router's `useParams` and `useSearchParams`, never from `window.location`.
 - UI follows `.claude/DESIGN.md`.
 - Import from `@/…`, never with `../`.
 - Query elements in tests by role or label (`getByRole`), not by test id or class name.

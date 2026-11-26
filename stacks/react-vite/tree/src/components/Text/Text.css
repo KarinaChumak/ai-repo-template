@@ -1,0 +1,7 @@
+.text {
+  margin: 0;
+}
+
+.text--muted {
+  color: var(--color-text-muted);
+}

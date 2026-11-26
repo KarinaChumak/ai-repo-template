@@ -8,6 +8,10 @@ Who has the problem, what it costs them today, and how they work around it.
 
 The kinds of users and what each needs from the product.
 
+## Glossary
+
+The words for the things in this product, one line each, as the code should name them. For example: "**Questionnaire**: the questions a job asks a candidate. Not \"job\": the page loads a questionnaire, not the job." Add a term before code uses it.
+
 ## Principles
 
 3–5 rules that settle trade-offs, such as "never lose a draft" or "ask only what we don't know".
