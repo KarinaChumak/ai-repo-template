@@ -324,6 +324,15 @@ append_missing_lines .claude/pr-size-ignore "$src_core/pr-size-ignore" "$src_sta
 
 chmod +x "$target"/.claude/scripts/* "$target"/.claude/hooks/*.sh 2>/dev/null || true
 
+# gh opens PRs in the repo it resolves from the remotes, and with an `upstream` remote it can pick
+# that one. Pin it to origin unless a default was already chosen with `gh repo set-default`.
+gh_pinned=0
+if [ "$inplace" -eq 0 ] && git -C "$target" remote get-url origin >/dev/null 2>&1 &&
+  ! git -C "$target" config --get-regexp '^remote\..*\.gh-resolved$' >/dev/null 2>&1; then
+  git -C "$target" config remote.origin.gh-resolved base
+  gh_pinned=1
+fi
+
 jq -n --arg stack "$stack" --arg mode "$mode" --arg commit "$template_commit" --arg decisions "$decisions" --arg notes "$notes" --arg notes_dir "$notes_dir" --argjson ci_review "$ci_review" \
   --arg date "$(date -u +%F)" \
   '{template: "ai-repo-template", template_commit: $commit, stack: $stack, mode: $mode, notes: $notes, notes_dir: $notes_dir, decisions_file: $decisions, ci_review: $ci_review, created: $date}' \
@@ -402,6 +411,10 @@ if [ "${#pending[@]}" -gt 0 ]; then
   echo "The generated versions are in .claude/ai-setup-pending/ (gitignored). Ask Claude:"
   echo "  merge the files listed in .claude/ai-setup-pending/MERGE.md"
   echo "Or rerun with --force to overwrite them."
+fi
+if [ "$gh_pinned" = 1 ]; then
+  echo
+  echo "gh now opens pull requests in origin ($(git -C "$target" remote get-url origin)), not in another remote such as upstream."
 fi
 if [ "$inplace" -eq 0 ] && [ "$KIND" = starter ]; then
   echo
