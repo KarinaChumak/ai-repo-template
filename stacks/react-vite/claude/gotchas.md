@@ -1,2 +1,3 @@
 - Change dependencies with `pnpm add` / `pnpm remove`; `pnpm-lock.yaml` is protected from direct edits.
 - The lint, TypeScript, Vite and Playwright configs are protected, so a check can't be turned off to make it pass. Ask a human to change them.
+- When pnpm stops with "Ignored build scripts", decide each package in `allowBuilds` in `pnpm-workspace.yaml`: `false` unless the package needs its script to work, and say which you chose in the PR. Don't hide pnpm's output: `check` runs the same install as CI and fails on it.

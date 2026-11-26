@@ -247,6 +247,7 @@ for stack_dir in "$here"/stacks/*/; do
     fi
     [ -f "$stack_dir/README.md.tpl" ] || [ ! -e "$pending" ] || fail "$label: set files aside for no reason"
     grep -qxF '.claude/ai-setup-pending/' "$repo/.gitignore" || fail "$label: pending folder isn't gitignored"
+    grep -qxF '.claude/launch.json' "$repo/.gitignore" || fail "$label: .claude/launch.json isn't gitignored"
     before=$(tree_sum "$repo")
     run_init "$here/init" --stack "$stack" --into "$repo"
     [ "$(tree_sum "$repo")" = "$before" ] || fail "$label: running init again changed files"
@@ -454,6 +455,16 @@ export function BadRef() {
         printf '%s\n' "$lint" | grep -qF "$want" || fail "$label: ESLint didn't flag: $want"
       done
       rm -rf "$app/src/pages/BadPage" "$app/src/features"
+      # The desktop app's launch.json is gitignored, so the formatter skips it.
+      printf '{"version":"0.0.1",\n"configurations":[]}\n' >"$app/.claude/launch.json"
+      (cd "$app" && pnpm -s format:check >/dev/null) || fail "$label: format:check flagged .claude/launch.json"
+      rm "$app/.claude/launch.json"
+      # check installs like CI does, so a lockfile out of step with package.json fails it.
+      cp "$app/package.json" "$work/package.json.bak"
+      jq '.dependencies["left-pad"] = "1.3.0"' "$work/package.json.bak" >"$app/package.json"
+      out=$(cd "$app" && .claude/scripts/check 2>&1) && fail "$label: check passed with a lockfile out of date"
+      printf '%s\n' "$out" | grep -q OUTDATED_LOCKFILE || fail "$label: check didn't fail on the install: $out"
+      cp "$work/package.json.bak" "$app/package.json"
       # A port of its own: Playwright reuses a server already on the port, even another project's.
       (cd "$app" && pnpm exec playwright install chromium >/dev/null && PORT=5299 .claude/scripts/e2e >/dev/null) ||
         fail "$label: e2e failed"
