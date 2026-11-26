@@ -10,7 +10,7 @@ The kinds of users and what each needs from the product.
 
 ## Glossary
 
-The words for the things in this product, one line each, as the code should name them. For example: "**Questionnaire**: the questions a job asks a candidate. Not \"job\": the page loads a questionnaire, not the job." Add a term before code uses it.
+The words for the things in this product, one line each, as the code should name them. For example: "**Booking**: a time slot one customer has reserved. Not \"appointment\" or \"reservation\"." Add a term before code uses it.
 
 ## Principles
 

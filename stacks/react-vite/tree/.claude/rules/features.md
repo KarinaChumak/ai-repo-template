@@ -9,11 +9,11 @@ paths:
 - Queries for an area live in its `queries.ts`. The hook returns the `useQuery` result unchanged:
 
   ```ts
-  export const questionnaireQuery = (jobId: string) =>
-    queryOptions({ queryKey: ['questionnaire', jobId], queryFn: () => getQuestionnaire(jobId) });
+  export const bookingQuery = (bookingId: string) =>
+    queryOptions({ queryKey: ['booking', bookingId], queryFn: () => getBooking(bookingId) });
 
-  export function useQuestionnaireQuery(jobId: string) {
-    return useQuery(questionnaireQuery(jobId));
+  export function useBookingQuery(bookingId: string) {
+    return useQuery(bookingQuery(bookingId));
   }
   ```
 

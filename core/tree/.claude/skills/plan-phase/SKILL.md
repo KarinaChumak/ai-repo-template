@@ -28,7 +28,7 @@ Each ticket is one PR. Estimates run low, often by half, and review adds more, s
 - Estimate changed lines per ticket, file by file, tests included. Lockfiles, generated files, snapshots and data files don't count.
 - The first 2–3 tickets of a project: about 150 lines each. They set the patterns (data fetching, page structure, components, tests) that every later ticket copies, so they get the most review rounds. Keep them small enough that reworking a pattern is cheap.
 - Every other ticket: at most about 300 lines.
-- Bigger than that: split it into separate tickets, each still a complete behavior, with `After` linking them. Example: "the page loads a questionnaire and shows its title, or 'not found'", then "the notice-period question renders and takes an answer", then "it's prefilled from the profile". Never one ticket with several stacked PRs.
+- Bigger than that: split it into separate tickets, each still a complete behavior, with `After` linking them. Example: "the page lists the customer's bookings, or says there are none", then "a booking can be cancelled", then "cancelling asks for a reason". Never one ticket with several stacked PRs.
 - Well under 50 lines: merge it into a neighbouring ticket unless it stands alone.
 
 ## 4. Order and parallel lanes

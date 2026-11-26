@@ -33,7 +33,7 @@ Present each one as a decision, not an open question:
 
 ## 3. Write the files
 
-1. **`__NOTES_DIR__/product.md`** from [product-template.md](product-template.md): problem, users, glossary, principles, scope, out of scope, open questions. Keep it to one page. The glossary names every thing Phase 1 works with, in the words the code will use. Where two words compete ("job" or "questionnaire"), say which one the code uses and why, and confirm it with the user.
+1. **`__NOTES_DIR__/product.md`** from [product-template.md](product-template.md): problem, users, glossary, principles, scope, out of scope, open questions. Keep it to one page. The glossary names every thing Phase 1 works with, in the words the code will use. Where two words compete ("booking" or "appointment"), say which one the code uses and why, and confirm it with the user.
 2. **`__DECISIONS_FILE__`**: add one entry per decision at the end of the file, in its existing format, with `Kickoff` as the ID:
 
    ```markdown
