@@ -98,6 +98,10 @@ check_result() {
     and (.permissions.deny | index("Bash(git push * main)") and index("Bash(git push *--force*)"))
     and ((.permissions.ask // []) | index("Bash(git push *)") | not)' \
     "$dir/.claude/settings.json" >/dev/null || fail "$label: Claude can't push its branch and open the PR on its own, or can push to main"
+  jq -e '.permissions.deny | index("Bash(python3 - *)") and index("Bash(perl -pi *)") and index("Bash(node -e *)") and index("Bash(sed -i *)")' \
+    "$dir/.claude/settings.json" >/dev/null || fail "$label: Claude can run inline scripts instead of the Edit tool"
+  jq -e '(.permissions.ask // []) | index("Bash(pnpm add *)") | not' "$dir/.claude/settings.json" >/dev/null ||
+    fail "$label: pnpm add asks every time"
   jq -e --arg d "$decisions" '.decisions_file == $d' "$dir/.claude/ai-setup.json" >/dev/null ||
     fail "$label: ai-setup.json doesn't record the decisions file"
   if [ "$mode" = team ]; then
@@ -257,6 +261,7 @@ for stack_dir in "$here"/stacks/*/; do
     fi
     [ -f "$stack_dir/README.md.tpl" ] || [ ! -e "$pending" ] || fail "$label: set files aside for no reason"
     grep -qxF '.claude/ai-setup-pending/' "$repo/.gitignore" || fail "$label: pending folder isn't gitignored"
+    grep -qxF '.claude/launch.json' "$repo/.gitignore" || fail "$label: .claude/launch.json isn't gitignored"
     before=$(tree_sum "$repo")
     run_init "$here/init" --stack "$stack" --into "$repo"
     [ "$(tree_sum "$repo")" = "$before" ] || fail "$label: running init again changed files"
@@ -391,6 +396,10 @@ sed -i.bak '1,200d' "$repo/src/a.ts" && rm "$repo/src/a.ts.bak"
 (cd "$repo" && git -c user.name=t -c user.email=t@t commit -qam shrink)
 out=$(size)
 printf '%s\n' "$out" | grep -qF 'pr-size: 100 changed lines' || fail "pr-size: deleted lines on the branch aren't counted: $out"
+(cd "$repo" && git mv .claude/WORKFLOW.md WORKFLOW-moved.md && echo moved >>WORKFLOW-moved.md &&
+  git -c user.name=t -c user.email=t@t commit -qam rename)
+out=$(size)
+printf '%s\n' "$out" | grep -qF 'pr-size: 101 changed lines' || fail "pr-size: a renamed file with one new line isn't counted as 1 line: $out"
 
 echo "== --ci-review adds the Claude review workflow"
 repo="$work/ci-review"
@@ -537,7 +546,28 @@ export function BadRef() {
       [ "$(printf '%s\n' "$raw" | grep -c .)" = 2 ] || fail "$label: raw-styles should flag the hex color and 13px, got: $raw"
       rm "$app/src/x.css"
       (cd "$app" && .claude/scripts/raw-styles >/dev/null) || fail "$label: raw-styles flagged the clean starter app"
-      (cd "$app" && pnpm exec playwright install chromium >/dev/null && .claude/scripts/e2e >/dev/null) ||
+      # Pages and features have no styles or HTML elements; tests mock neither fetch nor console.
+      mkdir -p "$app/src/pages/BadPage" "$app/src/features/bad"
+      : >"$app/src/pages/BadPage/BadPage.css"
+      printf "import './BadPage.css';\n\nexport function BadPage() {\n  return <div className=\"x\">x</div>;\n}\n" >"$app/src/pages/BadPage/BadPage.tsx"
+      printf "it('x', () => {\n  vi.stubGlobal('fetch', vi.fn());\n  vi.spyOn(console, 'warn');\n});\n" >"$app/src/features/bad/bad.test.ts"
+      lint=$(cd "$app" && pnpm -s exec eslint src/pages/BadPage src/features/bad 2>&1 || true)
+      for want in 'have no styles. Put them' 'render only components' 'Give the component' 'Mock the network with MSW' "Don't mock console"; do
+        printf '%s\n' "$lint" | grep -qF "$want" || fail "$label: ESLint didn't flag: $want"
+      done
+      rm -rf "$app/src/pages/BadPage" "$app/src/features"
+      # The desktop app's launch.json is gitignored, so the formatter skips it.
+      printf '{"version":"0.0.1",\n"configurations":[]}\n' >"$app/.claude/launch.json"
+      (cd "$app" && pnpm -s format:check >/dev/null) || fail "$label: format:check flagged .claude/launch.json"
+      rm "$app/.claude/launch.json"
+      # check installs like CI does, so a lockfile out of step with package.json fails it.
+      cp "$app/package.json" "$work/package.json.bak"
+      jq '.dependencies["left-pad"] = "1.3.0"' "$work/package.json.bak" >"$app/package.json"
+      out=$(cd "$app" && .claude/scripts/check 2>&1) && fail "$label: check passed with a lockfile out of date"
+      printf '%s\n' "$out" | grep -q OUTDATED_LOCKFILE || fail "$label: check didn't fail on the install: $out"
+      cp "$work/package.json.bak" "$app/package.json"
+      # A port of its own: Playwright reuses a server already on the port, even another project's.
+      (cd "$app" && pnpm exec playwright install chromium >/dev/null && PORT=5299 .claude/scripts/e2e >/dev/null) ||
         fail "$label: e2e failed"
     fi
   done

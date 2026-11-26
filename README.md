@@ -61,10 +61,12 @@ git clone https://github.com/<you>/ai-repo-template ~/Code/ai-repo-template
 
 ### react-vite
 
+- **Decided up front,** so Claude doesn't stop to ask: React Router for routing, TanStack Query for server data, MSW for API mocks in tests, plain CSS per component. `.claude/CLAUDE.md` lists them, plus what `/kickoff` still settles (the API server, translations, a widget library, forms).
+- **Where code goes:** generic styled components in `src/components/`, product components and queries in `src/features/<area>/`, one component per route in `src/pages/`. ESLint keeps pages and features free of CSS, `className` and HTML elements, and keeps tests from stubbing `fetch` or `console`.
 - **`quick-check`** (run before Claude stops): an incremental typecheck of the whole project, plus ESLint on the files the branch changed. ESLint includes the React Compiler rules from `eslint-plugin-react-hooks`, so code the compiler can't handle, like reading a ref during render, blocks Claude until it's fixed.
 - **`check`** (and CI): format check, lint, typecheck, unit tests, build. CI also runs the Playwright e2e tests.
 - **UI skills:** `/design-check` checks the branch's UI changes against `.claude/DESIGN.md` (tokens, layout, states, accessibility, copy), with `.claude/scripts/raw-styles` flagging raw colors and pixel sizes. `/verify-ui` runs the app, screenshots the changed screens at mobile and desktop widths, and runs e2e. `/scaffold-component` creates a component with its test, following `src/components/Button/`.
-- **Path rules:** `.claude/rules/components.md` and `.claude/rules/tests.md` load only when Claude works on those files.
+- **Path rules:** `.claude/rules/components.md`, `features.md` and `tests.md` load only when Claude works on those files.
 - **Protected:** `pnpm-lock.yaml` and the ESLint, TypeScript, Vite and Playwright configs, so a check can't be switched off to make it pass.
 - **Versions:** TypeScript stays on 6.0 until `typescript-eslint` supports 7. Accessibility lint uses `eslint-plugin-jsx-a11y-x`, a fork of `eslint-plugin-jsx-a11y` that supports ESLint 10. pnpm 12 only installs versions older than its minimum release age, so a brand-new package version can't be added the day it's published.
 
@@ -77,13 +79,13 @@ A stack is either a **starter** (ships app code in `tree/`, for new projects) or
 | `.claude/CLAUDE.md` | Commands, what "done" means, conventions, gotchas, and the `#` feedback rule |
 | `.claude/REVIEW.md` | What reviewers flag and skip, evidence rules, Important/Nit/Pre-existing tags |
 | `.claude/WORKFLOW.md` | For people: the loop from `/kickoff` to the merge in one table, and a checklist for before you hand the project over |
-| `.claude/skills/kickoff`, `plan-phase` | `/kickoff` turns an idea into decisions, `product.md` and a phased `plan.md` in the notes with only Phase 1 broken into tickets. `/plan-phase` breaks down the next phase: behavior slices, PRs under 500 lines, parallel lanes |
+| `.claude/skills/kickoff`, `plan-phase` | `/kickoff` turns an idea into decisions, `product.md` with a glossary the code names things after, and a phased `plan.md` in the notes with only Phase 1 broken into tickets. `/plan-phase` breaks down the next phase: behavior slices of one PR each, about 150 lines for the first tickets and at most 300 after, parallel lanes |
 | `.claude/skills/ticket` | "work on ticket T-04" (or `/ticket T-04`) runs `.claude/scripts/ticket start`, which makes a branch and a worktree in `.claude/worktrees/T-04` with its own dev-server port, and moves the session there, so the main checkout stays on `main` and tickets run in parallel. Claude reads the ticket and the latest decisions, proposes an approach, waits for your OK, then builds. `ticket remove T-04` cleans up after the merge |
 | `.claude/skills/finish`, `.claude/agents/reviewer.md` | Runs on its own when a ticket is done, or with `/finish`: proves each "done when", runs `check` and the size check, then has the `reviewer` agent review the branch. The agent runs in its own context and never saw how the code was written. Claude fixes the findings that hold up and notes the ones it rejects, runs `/simplify` and the UI checks, updates the plan and the decision log, then pushes and opens the PR with a "Local review" section |
 | `.claude/skills/address-review` | "address the comments": fetches the PR's unresolved threads, fixes them, replies and resolves them; disagreements stay open for you |
 | `decisions.md` in the notes | Decisions that affect more than one ticket. Entries are only ever added. In the repo, git merges the file with the `union` driver so parallel branches never conflict |
 | `.claude/scripts/` | `setup`, `check`, `test`, `fix`, `quick-check`, `ticket`, `pr-size`: the only commands hooks, skills and CI call |
-| `.claude/settings.json` | Permissions (Claude can push ticket branches and open PRs; pushing to `main`, force-pushing and merging PRs are denied), plus hooks: the current ticket's section from the plan at session start and after compaction, protect paths before edits, format after edits, `quick-check` before Claude stops |
+| `.claude/settings.json` | Permissions (Claude can push ticket branches and open PRs; pushing to `main`, force-pushing, merging PRs and editing files through inline Python, Perl, Node or `sed -i` scripts are denied), plus hooks: the current ticket's section from the plan at session start and after compaction, protect paths before edits, format after edits, `quick-check` before Claude stops |
 | `.claude/protected-paths` | Globs Claude may not edit. Starts with `.github/workflows/*` |
 | `.claude/pr-size-ignore` | Globs that don't count toward the 500-line PR limit: lockfiles, snapshots, `claude-notes/*` |
 | `.github/workflows/pr-size.yml` | Fails a PR over 500 changed lines, unless a human adds the `size-exception` label |

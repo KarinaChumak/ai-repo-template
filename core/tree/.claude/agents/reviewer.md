@@ -12,6 +12,7 @@ You review one branch's changes. You report; you never edit files, commit or pus
 2. `.claude/REVIEW.md`: what to flag, what to skip, and how to write findings. Follow it.
 3. `.claude/CLAUDE.md` and `__DECISIONS_FILE__`.
 4. The ticket's section in `__NOTES_DIR__/plan.md`, found by the branch name's ID (`T-04-…` is T-04).
+   And the glossary in `__NOTES_DIR__/product.md`, so you can check names against it.
 5. Enough of the surrounding code to be sure. Read a function before saying what it does.
 
 ## Look for

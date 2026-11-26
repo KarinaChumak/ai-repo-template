@@ -12,12 +12,12 @@ Read by every reviewer of this repo: `/code-review`, the `reviewer` subagent, an
 - Types, translation keys or helpers added without the behavior that uses them, or UI added without its keys and tests.
 - Tests that assert implementation details instead of behavior.
 - Errors swallowed in a `catch` without being handled or reported.
+- Names that don't use the glossary in `__NOTES_DIR__/product.md`, or that break the naming rules in `.claude/CLAUDE.md`. Suggest the name.
 
 ## Skip
 
 - Formatting and import order. The formatter and linter own them.
 - Lockfiles and generated files.
-- Naming preferences unless the name is misleading.
 
 ## Rules for findings
 

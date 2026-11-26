@@ -10,6 +10,7 @@
 
   --color-bg: #ffffff;
   --color-text: #1a1a1a;
+  --color-text-muted: #595959;
   --color-border: #767676;
   --color-accent: #2f5bd3;
   --color-on-accent: #ffffff;
@@ -24,6 +25,7 @@
   :root {
     --color-bg: #141414;
     --color-text: #f0f0f0;
+    --color-text-muted: #b3b3b3;
     --color-border: #8a8a8a;
     --color-accent: #7c9cff;
     --color-on-accent: #0d0d0d;
@@ -42,10 +44,4 @@ body {
   margin: 0;
   background: var(--color-bg);
   color: var(--color-text);
-}
-
-.app {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: var(--space-8) var(--space-4);
 }
