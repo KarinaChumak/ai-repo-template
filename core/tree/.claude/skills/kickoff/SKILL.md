@@ -13,7 +13,7 @@ Read before asking, so your questions are about decisions, not facts you could l
 
 - The user's description of the idea, and any brief, spec, mockup or ticket they point to.
 - The repo: README, `.claude/CLAUDE.md`, `__DECISIONS_FILE__`, existing code and data files.
-- `ai/product.md` and `ai/plan.md` if they exist. If they do, this is a kickoff for a new area: add to them instead of starting over, and ask the user first.
+- `__NOTES_DIR__/product.md` and `__NOTES_DIR__/plan.md` if they exist. If they do, this is a kickoff for a new area: add to them instead of starting over, and ask the user first.
 
 ## 2. List the decisions, then interview
 
@@ -31,7 +31,7 @@ Present each one as a decision, not an open question:
 
 ## 3. Write the files
 
-1. **`ai/product.md`** from [product-template.md](product-template.md): problem, users, principles, scope, out of scope, open questions. Keep it to one page.
+1. **`__NOTES_DIR__/product.md`** from [product-template.md](product-template.md): problem, users, principles, scope, out of scope, open questions. Keep it to one page.
 2. **`__DECISIONS_FILE__`**: add one entry per decision at the end of the file, in its existing format, with `Kickoff` as the ID:
 
    ```markdown
@@ -40,7 +40,7 @@ Present each one as a decision, not an open question:
    One database, `org_id` on every row. Why: simplest to run. Rejected: schema per org, database per org.
    ```
 
-3. **`ai/plan.md`** in the layout of [plan-template.md](../plan-phase/plan-template.md): every phase in the `## Phases` list with a one-line goal and exit. Then break down **Phase 1 only**, following the `/plan-phase` skill. Phase 1 is a walking skeleton: the thinnest version that works end to end, so the shared pieces exist before tickets run in parallel.
+3. **`__NOTES_DIR__/plan.md`** in the layout of [plan-template.md](../plan-phase/plan-template.md): every phase in the `## Phases` list with a one-line goal and exit. Then break down **Phase 1 only**, following the `/plan-phase` skill. Phase 1 is a walking skeleton: the thinnest version that works end to end, so the shared pieces exist before tickets run in parallel.
 
 ## 4. Report
 

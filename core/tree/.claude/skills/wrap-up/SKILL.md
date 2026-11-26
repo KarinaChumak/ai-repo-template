@@ -1,6 +1,6 @@
 ---
 name: wrap-up
-description: Finish a ticket's PR. Proves each "done when", runs the checks, updates the ticket in ai/plan.md, records global decisions and drafts the PR description. Use when the work on a ticket or one of its PRs is done, or when the user runs /wrap-up.
+description: Finish a ticket's PR. Proves each "done when", runs the checks, updates the ticket in the plan, records global decisions and drafts the PR description. Use when the work on a ticket or one of its PRs is done, or when the user runs /wrap-up.
 ---
 
 # Wrap up a ticket
@@ -15,7 +15,7 @@ Run `.claude/scripts/check` and fix what fails. Then run `git diff --stat main..
 
 ## 3. Update the plan
 
-In the ticket's section in `ai/plan.md`:
+In the ticket's section in `__NOTES_DIR__/plan.md`:
 
 - `Status: in review`, or `in progress (PR 1 of 2 in review)` when more PRs follow.
 - Add an `Outcome:` line: what was built, in one or two sentences, and anything that changes later tickets. `/plan-phase` reads it.

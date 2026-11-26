@@ -12,8 +12,8 @@ The source of `ai-repo-template`. `init` renders `core/`, `stacks/<name>/` and `
 # Conventions
 
 - `init`, `tests/test-init.sh`, hooks and stack scripts must run on macOS's bash 3.2: no associative arrays, no `mapfile`, and guard empty-array expansions.
-- Generated repos keep AI config in `.claude/` and the files Claude updates constantly (`plan.md`, `product.md`, `decisions.md`) in `ai/`, because Claude Code asks before every edit under `.claude/`. The only other files `init` may put at the root are ones another tool requires there: `.gitignore`, `.gitattributes`, `.worktreeinclude`, `.github/`, and a decisions file if `--decisions-file` asks for it.
-- `core/CLAUDE.md` and `core/REVIEW.md` hold `@@STACK_<NAME>@@` lines, each replaced by `stacks/<stack>/claude/<name>.md` or removed if that file doesn't exist, and `__DECISIONS_FILE__`, replaced by the decision log's path.
+- Generated repos keep AI config in `.claude/`, always committed. The files Claude updates constantly (`plan.md`, `product.md`, `decisions.md`) are the notes, kept out of `.claude/` because Claude Code asks before every edit there. `--notes external` (the default) puts them in `~/claude-notes/<repo>/`, never committed; `--notes in-repo` puts them in `claude-notes/`. The only other files `init` may put at the root are ones another tool requires there: `.gitignore`, `.gitattributes` (only for a decision log in the repo), `.worktreeinclude`, `.github/`, and a decisions file if `--decisions-file` asks for it.
+- `core/CLAUDE.md` and `core/REVIEW.md` hold `@@STACK_<NAME>@@` lines, each replaced by `stacks/<stack>/claude/<name>.md` or removed if that file doesn't exist, `__DECISIONS_FILE__`, replaced by the decision log's path, and `__NOTES_DIR__`, replaced by the notes folder. Every core file can use the last two.
 - Hooks, skills and CI call only `.claude/scripts/*`, never a stack's tools directly, so `core/` stays stack-agnostic.
 - Generated guidance follows Anthropic's best practices: short CLAUDE.md, no emphasis words, deterministic rules in hooks, everything else in skills and rules.
 - Every change to `init` gets a check in `tests/test-init.sh`.

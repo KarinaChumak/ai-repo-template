@@ -6,12 +6,14 @@ here=$(cd "$(dirname "$0")" && pwd)
 
 usage() {
   cat <<EOF
-Usage: ./init [--stack <name>] [--mode solo|team] [--into <dir>] [--decisions-file <path>] [--name <project>] [--ci-review] [--force]
+Usage: ./init [--stack <name>] [--mode solo|team] [--into <dir>] [--notes external|in-repo] [--decisions-file <path>] [--name <project>] [--ci-review] [--force]
 
   --stack           Which stack to set up. Asked interactively if omitted.
   --mode            solo (default) or team. Team adds CODEOWNERS.
   --into            Add the setup to an existing repo instead of turning this clone into the project.
-  --decisions-file  Where the decision log goes, relative to the repo root. Default: ai/decisions.md
+  --notes           Where plans, the product brief and decisions live. external (default): ~/claude-notes/<repo>/,
+                    never committed. in-repo: claude-notes/ in the repo, committed.
+  --decisions-file  Where the decision log goes, relative to the repo root. Default: decisions.md in the notes.
   --name            Project name for starter stacks. Defaults to the target folder name.
   --ci-review       Add .github/workflows/claude-review.yml: a Claude review when a PR is marked ready, and @claude in PR comments.
   --force           Overwrite files that already exist. Without it, existing files are kept and listed.
@@ -38,13 +40,14 @@ die() {
 [ -d "$here/core" ] && [ -d "$here/stacks" ] || die "run this from a clone of ai-repo-template."
 command -v jq >/dev/null || die "jq is required (brew install jq)."
 
-stack="" mode="" name="" into="" decisions="ai/decisions.md" force=0 ci_review=false
+stack="" mode="" name="" into="" decisions="" notes=external force=0 ci_review=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --stack) stack=${2:?}; shift 2 ;;
     --mode) mode=${2:?}; shift 2 ;;
     --name) name=${2:?}; shift 2 ;;
     --into) into=${2:?}; shift 2 ;;
+    --notes) notes=${2:?}; shift 2 ;;
     --decisions-file) decisions=${2:?}; shift 2 ;;
     --ci-review) ci_review=true; shift ;;
     --force) force=1; shift ;;
@@ -67,8 +70,11 @@ fi
 mode=${mode:-solo}
 case "$mode" in solo | team) ;; *) die "mode must be solo or team." ;; esac
 
-case "$decisions" in /* | *..* | */) die "--decisions-file must be a file path inside the repo, like DECISIONS.md." ;; esac
-printf '%s' "$decisions" | grep -Eq '^[A-Za-z0-9._/-]+$' || die "--decisions-file may only contain letters, digits, '.', '_', '-' and '/'."
+case "$notes" in external | in-repo) ;; *) die "--notes must be external or in-repo." ;; esac
+if [ -n "$decisions" ]; then
+  case "$decisions" in /* | *..* | */) die "--decisions-file must be a file path inside the repo, like DECISIONS.md." ;; esac
+  printf '%s' "$decisions" | grep -Eq '^[A-Za-z0-9._/-]+$' || die "--decisions-file may only contain letters, digits, '.', '_', '-' and '/'."
+fi
 
 if [ -n "$into" ]; then
   [ -d "$into" ] || die "$into is not a directory."
@@ -88,6 +94,22 @@ name=${name:-$(basename "$target")}
 slug=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//')
 template_commit=$(git -C "$here" rev-parse --short HEAD 2>/dev/null || echo unknown)
 
+# The notes: the plan, the product brief and, by default, the decision log. External notes mirror
+# the repo's folder name under ~/claude-notes, so every worktree of the repo shares them.
+if [ "$notes" = in-repo ]; then
+  notes_dir=claude-notes
+  notes_abs="$target/claude-notes"
+else
+  repo_name=$(basename "$target" | tr -cd 'A-Za-z0-9._-')
+  notes_dir="~/claude-notes/$repo_name"
+  notes_abs="$HOME/claude-notes/$repo_name"
+fi
+decisions_in_repo=1
+if [ -z "$decisions" ]; then
+  decisions="$notes_dir/decisions.md"
+  [ "$notes" = in-repo ] || decisions_in_repo=0
+fi
+
 # Work from a copy, because in-place mode deletes the template's own files.
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -99,13 +121,14 @@ src_stack="$tmp/stack"
 
 # Fill in placeholders in the copy, before anything is placed, so files that were already in the
 # target are never touched. __PROJECT_NAME__ is the package slug; __PROJECT_TITLE__ is the name people
-# see, kept to characters that are safe in sed, HTML and JSX; __DECISIONS_FILE__ is the decision log.
+# see, kept to characters that are safe in sed, HTML and JSX; __DECISIONS_FILE__ is the decision log;
+# __NOTES_DIR__ is the notes folder.
 title=$(printf '%s' "$name" | tr -cd 'A-Za-z0-9 ._-')
 title=${title:-$slug}
 while IFS= read -r f; do
-  sed -i.bak "s/__PROJECT_NAME__/$slug/g; s/__PROJECT_TITLE__/$title/g; s|__DECISIONS_FILE__|$decisions|g" "$f" &&
+  sed -i.bak "s/__PROJECT_NAME__/$slug/g; s/__PROJECT_TITLE__/$title/g; s|__DECISIONS_FILE__|$decisions|g; s|__NOTES_DIR__|$notes_dir|g" "$f" &&
     rm -f "$f.bak"
-done < <(grep -rlE '__(PROJECT_NAME|PROJECT_TITLE|DECISIONS_FILE)__' "$tmp" 2>/dev/null || true)
+done < <(grep -rlE '__(PROJECT_NAME|PROJECT_TITLE|DECISIONS_FILE|NOTES_DIR)__' "$tmp" 2>/dev/null || true)
 
 pending_dir="$target/.claude/ai-setup-pending"
 created=()
@@ -204,13 +227,23 @@ merge_json='
 
 render "$src_core/CLAUDE.md" "$src_stack/claude" >"$tmp/CLAUDE.md"
 render "$src_core/REVIEW.md" "$src_stack/claude" >"$tmp/REVIEW.md"
-echo "$decisions merge=union" >"$tmp/gitattributes"
+: >"$tmp/gitattributes"
+[ "$decisions_in_repo" = 0 ] || echo "$decisions merge=union" >"$tmp/gitattributes"
 
 settings="$target/.claude/settings.json"
 settings_inputs=("$src_core/settings.json")
 [ ! -f "$src_stack/settings.json" ] || settings_inputs+=("$src_stack/settings.json")
 [ ! -f "$settings" ] || settings_inputs=("$settings" "${settings_inputs[@]}")
 jq -s "$merge_json" "${settings_inputs[@]}" >"$tmp/settings.json"
+if [ "$notes" = external ]; then
+  # Claude reads and edits the notes outside the repo without asking.
+  jq --arg d "$notes_dir" '
+    def add($xs): reduce $xs[] as $x (. // []; if index([$x]) then . else . + [$x] end);
+    .permissions.allow |= add(["Read(\($d)/**)", "Edit(\($d)/**)", "Write(\($d)/**)"])
+    | .permissions.additionalDirectories |= add([$d])
+  ' "$tmp/settings.json" >"$tmp/settings.notes.json"
+  mv "$tmp/settings.notes.json" "$tmp/settings.json"
+fi
 
 if [ "$inplace" -eq 1 ]; then
   for p in core stacks team tests user init install-user README.md CLAUDE.md; do
@@ -234,7 +267,13 @@ for doc in CLAUDE.md REVIEW.md; do
     place "$tmp/$doc" ".claude/$doc"
   fi
 done
-place "$src_core/decisions.md" "$decisions"
+if [ "$decisions_in_repo" = 1 ]; then
+  place "$src_core/decisions.md" "$decisions"
+elif [ ! -e "$notes_abs/decisions.md" ]; then
+  mkdir -p "$notes_abs"
+  cp -p "$src_core/decisions.md" "$notes_abs/decisions.md"
+  created+=("$decisions")
+fi
 [ ! -f "$src_stack/README.md.tpl" ] || place "$src_stack/README.md.tpl" README.md
 [ "$ci_review" = false ] || place "$src_core/ci-review/claude-review.yml" .github/workflows/claude-review.yml
 
@@ -244,15 +283,15 @@ cp "$tmp/settings.json" "$settings"
 
 append_missing_lines .claude/protected-paths "$src_core/protected-paths" "$src_stack/protected-paths"
 append_missing_lines .gitignore "$src_core/gitignore" "$src_stack/gitignore"
-append_missing_lines .gitattributes "$tmp/gitattributes"
+[ ! -s "$tmp/gitattributes" ] || append_missing_lines .gitattributes "$tmp/gitattributes"
 append_missing_lines .worktreeinclude "$src_core/worktreeinclude"
 append_missing_lines .claude/pr-size-ignore "$src_core/pr-size-ignore" "$src_stack/pr-size-ignore"
 
 chmod +x "$target"/.claude/scripts/* "$target"/.claude/hooks/*.sh 2>/dev/null || true
 
-jq -n --arg stack "$stack" --arg mode "$mode" --arg commit "$template_commit" --arg decisions "$decisions" --argjson ci_review "$ci_review" \
+jq -n --arg stack "$stack" --arg mode "$mode" --arg commit "$template_commit" --arg decisions "$decisions" --arg notes "$notes" --arg notes_dir "$notes_dir" --argjson ci_review "$ci_review" \
   --arg date "$(date -u +%F)" \
-  '{template: "ai-repo-template", template_commit: $commit, stack: $stack, mode: $mode, decisions_file: $decisions, ci_review: $ci_review, created: $date}' \
+  '{template: "ai-repo-template", template_commit: $commit, stack: $stack, mode: $mode, notes: $notes, notes_dir: $notes_dir, decisions_file: $decisions, ci_review: $ci_review, created: $date}' \
   >"$target/.claude/ai-setup.json"
 
 if [ "${#pending[@]}" -gt 0 ]; then
@@ -276,6 +315,7 @@ fi
 
 echo
 echo "Set up '$stack' ($mode) in $target"
+echo "Notes (plan, product brief, decisions): $notes_dir"
 echo "Written: ${#created[@]} files"
 if [ "${#pending[@]}" -gt 0 ]; then
   echo

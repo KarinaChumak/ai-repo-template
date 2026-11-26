@@ -4,10 +4,10 @@ A Claude Code setup for new and existing repos, built for big, ambiguous project
 
 It's a point-in-time template, not a library. `init` writes the setup into a repo, and from then on that repo owns it and changes it freely. Nothing syncs back.
 
-The setup lives in two folders, so it never mixes with your code:
+The setup lives in two places, so it never mixes with your code:
 
 - **`.claude/`**: config and rules, edited rarely: `CLAUDE.md`, `REVIEW.md`, settings, hooks, skills, scripts. Claude Code asks before every edit here, which is what you want for rule files.
-- **`ai/`**: the files Claude updates all the time: `plan.md`, `product.md` and `decisions.md`. Edits here don't need a prompt, so planning and decisions work in unattended runs too.
+- **The notes**: the files Claude updates all the time: `plan.md`, `product.md` and `decisions.md`. By default they live outside the repo in `~/claude-notes/<repo>/`, never committed, and shared by every worktree of the repo. With `--notes in-repo` they're in `claude-notes/` and committed, for projects where others should see the plan and decisions, like a take-home task. Either way Claude edits them without a prompt, so planning works in unattended runs too.
 
 ## Start a new project
 
@@ -42,7 +42,8 @@ git clone https://github.com/<you>/ai-repo-template ~/Code/ai-repo-template
 | `--stack <name>` | asked | See the table below |
 | `--mode solo\|team` | `solo` | `team` adds `.github/CODEOWNERS` so `.claude/` and `.github/` always need a code owner's review |
 | `--into <dir>` | this clone | Add the setup to an existing repo |
-| `--decisions-file <path>` | `ai/decisions.md` | Where the decision log goes, for a project that needs it somewhere else, such as `DECISIONS.md` |
+| `--notes external\|in-repo` | `external` | Where the notes live: `~/claude-notes/<repo>/` (never committed) or `claude-notes/` in the repo (committed) |
+| `--decisions-file <path>` | `decisions.md` in the notes | Where the decision log goes, for a project that needs it somewhere else, such as `DECISIONS.md` |
 | `--ci-review` | off | Add `.github/workflows/claude-review.yml`: Claude reviews a PR (code and security, one pass) when it's marked ready, and answers `@claude` in PR comments. Needs the Claude GitHub app (`/install-github-app`) and an `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` secret |
 | `--force` | off | Overwrite existing files |
 
@@ -71,14 +72,14 @@ A stack is either a **starter** (ships app code in `tree/`, for new projects) or
 | `.claude/CLAUDE.md` | Commands, what "done" means, conventions, gotchas, and the `#` feedback rule |
 | `.claude/REVIEW.md` | What reviewers flag and skip, evidence rules, Important/Nit/Pre-existing tags |
 | `.claude/WORKFLOW.md` | For people: the loop from `/kickoff` to the merge in one table, and a checklist for before you hand the project over |
-| `.claude/skills/kickoff`, `plan-phase` | `/kickoff` turns an idea into decisions, `ai/product.md` and a phased `ai/plan.md` with only Phase 1 broken into tickets. `/plan-phase` breaks down the next phase: behavior slices, PRs under 500 lines, parallel lanes |
+| `.claude/skills/kickoff`, `plan-phase` | `/kickoff` turns an idea into decisions, `product.md` and a phased `plan.md` in the notes with only Phase 1 broken into tickets. `/plan-phase` breaks down the next phase: behavior slices, PRs under 500 lines, parallel lanes |
 | `.claude/skills/ticket`, `wrap-up` | "work on ticket T-04" (or `/ticket T-04`) runs `.claude/scripts/ticket start`, which makes a branch and a worktree in `.claude/worktrees/T-04` with its own dev-server port, and moves the session there, so the main checkout stays on `main` and tickets run in parallel. Claude reads the ticket and the latest decisions, proposes an approach, waits for your OK, then builds. `/wrap-up` proves each "done when", runs `check`, updates the ticket, records global decisions and drafts the PR. `ticket remove T-04` cleans up after the merge |
 | `.claude/skills/pre-pr`, `address-review`, `.claude/agents/reviewer.md` | `/pre-pr`, run after `/wrap-up`: size check, `check`, a draft PR, then `/code-review` and the `reviewer` agent post their checked findings as inline comments starting with `🤖 Claude review:`, then `/simplify`, UI checks where the stack has them, and `check` again. You resolve the comments that shouldn't be fixed and leave the rest open; `/address-review` fixes the open ones, replies and resolves them |
-| `ai/decisions.md` | Decisions that affect more than one ticket. Entries are only ever added, and git merges the file with the `union` driver so parallel branches never conflict |
+| `decisions.md` in the notes | Decisions that affect more than one ticket. Entries are only ever added. In the repo, git merges the file with the `union` driver so parallel branches never conflict |
 | `.claude/scripts/` | `setup`, `check`, `test`, `fix`, `quick-check`, `ticket`, `pr-size`: the only commands hooks, skills and CI call |
-| `.claude/settings.json` | Permissions (merging PRs is denied: a human merges), plus hooks: the current ticket's section from `ai/plan.md` at session start and after compaction, protect paths before edits, format after edits, `quick-check` before Claude stops |
+| `.claude/settings.json` | Permissions (merging PRs is denied: a human merges), plus hooks: the current ticket's section from the plan at session start and after compaction, protect paths before edits, format after edits, `quick-check` before Claude stops |
 | `.claude/protected-paths` | Globs Claude may not edit. Starts with `.github/workflows/*` |
-| `.claude/pr-size-ignore` | Globs that don't count toward the 500-line PR limit: lockfiles, snapshots, `ai/*` |
+| `.claude/pr-size-ignore` | Globs that don't count toward the 500-line PR limit: lockfiles, snapshots, `claude-notes/*` |
 | `.github/workflows/pr-size.yml` | Fails a PR over 500 changed lines, unless a human adds the `size-exception` label |
 | `.claude/ai-setup.json` | Which template commit, stack, mode and decisions file it came from |
 | `.github/pull_request_template.md` | Why, testing, decisions, risk, how to revert |

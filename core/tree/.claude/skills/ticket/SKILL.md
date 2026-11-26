@@ -1,6 +1,6 @@
 ---
 name: ticket
-description: Start or resume work on a ticket from ai/plan.md in its own branch and worktree. Use when the user says "work on ticket T-04", "next ticket", "continue T-04", or runs /ticket.
+description: Start or resume work on a ticket from the plan in its own branch and worktree. Use when the user says "work on ticket T-04", "next ticket", "continue T-04", or runs /ticket.
 ---
 
 # Work on a ticket
@@ -9,7 +9,7 @@ One ticket, one session, one worktree. The main checkout stays on `main`, so oth
 
 ## 1. Find the ticket
 
-- Read the ticket's `### <ID> <title>` section in `ai/plan.md`.
+- Read the ticket's `### <ID> <title>` section in `__NOTES_DIR__/plan.md`.
 - For "next ticket": pick the first ticket with `Status: todo` whose `After` tickets are all done, and confirm it with the user.
 - If its `After` tickets aren't merged yet, or another ticket in progress has the same `Touches`, say so and ask before starting.
 
@@ -23,13 +23,13 @@ One ticket, one session, one worktree. The main checkout stays on `main`, so oth
 
 ## 3. Read before proposing
 
-- `.claude/CLAUDE.md`, the ticket's section, and `ai/product.md`.
-- `__DECISIONS_FILE__` as it is on `main` (`git show origin/main:__DECISIONS_FILE__`, or `main:` without a remote), since other tickets may have added decisions after this branch started.
+- `.claude/CLAUDE.md`, the ticket's section, and `__NOTES_DIR__/product.md`.
+- `__DECISIONS_FILE__`. If it's in the repo, read it as it is on `main` (`git show origin/main:__DECISIONS_FILE__`, or `main:` without a remote), since other tickets may have added decisions after this branch started.
 - The code in the ticket's `Touches`.
 
 ## 4. Mark it started
 
-In the ticket's section, set `Status: in progress` and `Branch: <branch>`. Commit that with the first code change, not alone.
+In the ticket's section, set `Status: in progress` and `Branch: <branch>`. If the notes are in the repo, commit that with the first code change, not alone.
 
 ## 5. Propose, then build
 

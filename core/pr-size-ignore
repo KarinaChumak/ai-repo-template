@@ -7,4 +7,4 @@ yarn.lock
 *.snap
 *.svg
 *.min.js
-ai/*
+claude-notes/*
