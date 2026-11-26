@@ -3,3 +3,5 @@
 - Import from `@/…`, never with `../`.
 - Query elements in tests by role or label (`getByRole`), not by test id or class name.
 - Don't add `useMemo`, `useCallback` or `memo` for performance: React Compiler memoizes. Use them only when a value's identity matters to an effect.
+- For a component's API (a pile of boolean props, a compound component, `renderX` props), follow the `vercel-composition-patterns` skill.
+- If the `vercel-react-best-practices` skill is installed, skip its rules that don't fit this stack: the Next.js and server rules (`server-*`, `next/dynamic`), SWR (this stack uses TanStack Query), manual memoization and handler refs (`rerender-memo`, `advanced-*`: React Compiler covers them), and `bundle-barrel-imports` for a component's own `index.ts`.

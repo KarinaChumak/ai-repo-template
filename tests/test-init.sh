@@ -393,12 +393,21 @@ for agent in "$here"/core/tree/.claude/agents/*.md; do
   grep -qE '^tools: ' "$agent" || fail "$agent: no tools list"
 done
 
+echo "== react-vite ships Vercel's composition-patterns skill unchanged"
+vendored=.claude/skills/vercel-composition-patterns
+diff -r "$here/stacks/react-vite/tree/$vendored" "$work/new-react-vite-solo/My App/$vendored" >/dev/null ||
+  fail "react-vite: $vendored is missing or changed in the generated repo"
+grep -qF 'vercel-react-best-practices' "$work/new-react-vite-solo/My App/.claude/CLAUDE.md" ||
+  fail "react-vite: CLAUDE.md doesn't say which react-best-practices rules to skip"
+
 echo "== every skill has a name matching its folder and a description"
 while IFS= read -r skill; do
   folder=$(basename "$(dirname "$skill")")
   [ "$(sed -n '1p' "$skill")" = --- ] || fail "$skill: no frontmatter"
   grep -qxF "name: $folder" "$skill" || fail "$skill: name isn't '$folder'"
-  grep -qE '^description: .{40,}' "$skill" || fail "$skill: description missing or too short to trigger on"
+  # On one line, or folded onto the indented lines below it, as vendored skills write it.
+  description=$(awk '/^description:/ { d = substr($0, 13); on = 1; next } on && /^  / { d = d " " $0; next } { on = 0 } END { print d }' "$skill")
+  [ "$(printf '%s' "$description" | tr -s ' ' | wc -c)" -ge 40 ] || fail "$skill: description missing or too short to trigger on"
   for link in $(grep -oE '\]\([a-z./-]+\.md\)' "$skill" | tr -d '])('); do
     [ -f "$(dirname "$skill")/$link" ] || fail "$skill: links to missing $link"
   done

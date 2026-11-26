@@ -5,3 +5,5 @@ playwright-report
 test-results
 .verify
 .claude/settings.json
+# Vendored skill, kept byte for byte as upstream ships it.
+.claude/skills/vercel-composition-patterns/
