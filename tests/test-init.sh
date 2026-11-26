@@ -94,7 +94,7 @@ check_result() {
   esac
   jq -e '.hooks.Stop and .hooks.PreToolUse and .hooks.PostToolUse and (.permissions.deny | index("Bash(gh pr merge *)"))' \
     "$dir/.claude/settings.json" >/dev/null || fail "$label: settings.json incomplete"
-  jq -e '(.permissions.allow | index("Bash(git push -u origin *)") and index("Bash(gh pr create *)"))
+  jq -e '(.permissions.allow | index("Bash(git push -u origin *)") and index("Bash(gh pr create *)") and index("Bash(gh pr checks *)"))
     and (.permissions.deny | index("Bash(git push * main)") and index("Bash(git push *--force*)"))
     and ((.permissions.ask // []) | index("Bash(git push *)") | not)' \
     "$dir/.claude/settings.json" >/dev/null || fail "$label: Claude can't push its branch and open the PR on its own, or can push to main"
