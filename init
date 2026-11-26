@@ -6,7 +6,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 
 usage() {
   cat <<EOF
-Usage: ./init [--stack <name>] [--mode solo|team] [--into <dir>] [--notes external|in-repo] [--decisions-file <path>] [--name <project>] [--ci-review] [--force]
+Usage: ./init [--stack <name>] [--mode solo|team] [--into <dir>] [--notes external|in-repo] [--decisions-file <path>] [--name <project>] [--ci-review] [--no-pr] [--protect-main] [--force]
 
   --stack           Which stack to set up. Asked interactively if omitted.
   --mode            solo (default) or team. Team adds CODEOWNERS.
@@ -16,6 +16,11 @@ Usage: ./init [--stack <name>] [--mode solo|team] [--into <dir>] [--notes extern
   --decisions-file  Where the decision log goes, relative to the repo root. Default: decisions.md in the notes.
   --name            Project name for starter stacks. Defaults to the target folder name.
   --ci-review       Add .github/workflows/claude-review.yml: a Claude review when a PR is marked ready, and @claude in PR comments.
+  --no-pr           Leave the files uncommitted. By default, in a clean checkout of a GitHub repo, init commits them
+                    on the ai-repo-setup branch and opens a PR called "AI repo setup".
+  --protect-main    Also require PRs for the default branch, admins included, and delete branches once their
+                    PR is merged. This is the default for a new
+                    project (without --into); an existing repo keeps its settings unless you pass this.
   --force           Overwrite files that already exist. Without it, existing files are kept and listed.
 
 Stacks:
@@ -40,7 +45,7 @@ die() {
 [ -d "$here/core" ] && [ -d "$here/stacks" ] || die "run this from a clone of ai-repo-template."
 command -v jq >/dev/null || die "jq is required (brew install jq)."
 
-stack="" mode="" name="" into="" decisions="" notes=external force=0 ci_review=false
+stack="" mode="" name="" into="" decisions="" notes=external force=0 ci_review=false open_pr=1 protect=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --stack) stack=${2:?}; shift 2 ;;
@@ -50,6 +55,8 @@ while [ $# -gt 0 ]; do
     --notes) notes=${2:?}; shift 2 ;;
     --decisions-file) decisions=${2:?}; shift 2 ;;
     --ci-review) ci_review=true; shift ;;
+    --no-pr) open_pr=0; shift ;;
+    --protect-main) protect=1; shift ;;
     --force) force=1; shift ;;
     -h | --help) usage; exit 0 ;;
     *) usage >&2; die "unknown option $1" ;;
@@ -84,6 +91,34 @@ if [ -n "$into" ]; then
 else
   target=$here
   inplace=1
+  protect=1
+fi
+
+# Read the git state before anything is written. init commits its files and opens the setup PR only
+# from a clean checkout of the repo's top level, so none of the user's own changes end up in it.
+GH=${GH:-gh}
+git_skip="" slug_gh="" base=""
+if [ "$(git -C "$target" rev-parse --show-toplevel 2>/dev/null)" != "$(cd "$target" && pwd -P)" ]; then
+  git_skip="$target is not the top of a git repo"
+else
+  origin_url=$(git -C "$target" config --get remote.origin.url || true)
+  slug_gh=$(printf '%s\n' "$origin_url" | sed -nE 's#^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)([^/]+/[^/]+)$#\2#p' | sed 's/\.git$//')
+  base=$(git -C "$target" branch --show-current)
+  if [ -z "$origin_url" ]; then
+    git_skip="the repo has no origin remote"
+  elif [ -z "$slug_gh" ]; then
+    git_skip="origin is not a GitHub repo"
+  elif ! command -v "$GH" >/dev/null; then
+    git_skip="gh is not installed"
+  elif ! git -C "$target" rev-parse -q --verify HEAD >/dev/null; then
+    git_skip="the repo has no commits yet"
+  elif [ -z "$base" ]; then
+    git_skip="HEAD is detached"
+  elif [ -n "$(git -C "$target" status --porcelain)" ]; then
+    git_skip="there were uncommitted changes before init"
+  elif git -C "$target" rev-parse -q --verify refs/heads/ai-repo-setup >/dev/null; then
+    git_skip="the ai-repo-setup branch already exists"
+  fi
 fi
 
 KIND="" DESCRIPTION=""
@@ -313,6 +348,50 @@ if [ "${#pending[@]}" -gt 0 ]; then
   } >"$pending_dir/MERGE.md"
 fi
 
+# Hand the setup over as a PR instead of leaving it uncommitted. Each step that fails leaves the
+# files in place and says why, because they're already written.
+pr_url="" pr_note="" protect_note=""
+if [ "$open_pr" -eq 0 ]; then
+  pr_note="Not committed (--no-pr)."
+elif [ -n "$git_skip" ]; then
+  pr_note="Not committed: $git_skip."
+else
+  pr_body="Adds the Claude Code setup from ai-repo-template: stack \`$stack\`, $mode mode, notes $notes ($notes_dir).
+
+Start with \`.claude/WORKFLOW.md\`. \`.claude/ai-setup.json\` records how this was generated."
+  if [ "${#pending[@]}" -gt 0 ]; then
+    pr_body="$pr_body
+
+These files already existed and were kept: ${pending_into[*]}. The generated versions are in \`.claude/ai-setup-pending/\`, which is gitignored; merge them in a follow-up commit on this branch."
+  fi
+  if ! { git -C "$target" switch -q -c ai-repo-setup &&
+    git -C "$target" add -A &&
+    git -C "$target" commit -q -m "AI repo setup"; }; then
+    pr_note="Couldn't commit the files on the ai-repo-setup branch; see the git error above."
+  elif ! git -C "$target" push -q -u origin ai-repo-setup; then
+    pr_note="Committed on ai-repo-setup, but the push failed. Push it and open the PR yourself."
+  elif ! pr_url=$("$GH" pr create -R "$slug_gh" --base "$base" --head ai-repo-setup --title "AI repo setup" --body "$pr_body"); then
+    pr_url=""
+    pr_note="Pushed ai-repo-setup, but gh couldn't open the PR. Open it yourself: gh pr create --head ai-repo-setup"
+  fi
+fi
+if [ "$protect" -eq 1 ] && [ -n "$slug_gh" ] && command -v "$GH" >/dev/null; then
+  default_branch=$("$GH" repo view "$slug_gh" --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)
+  default_branch=${default_branch:-main}
+  if printf '%s' '{"required_status_checks":null,"enforce_admins":true,"required_pull_request_reviews":{"required_approving_review_count":0},"restrictions":null}' |
+    "$GH" api -X PUT "repos/$slug_gh/branches/$default_branch/protection" --input - >/dev/null; then
+    protect_note="Protected $default_branch on GitHub: changes land through PRs, admins included."
+    # A merged PR's branch is deleted, so nothing is left behind pointing at it.
+    if "$GH" api -X PATCH "repos/$slug_gh" -F delete_branch_on_merge=true >/dev/null; then
+      protect_note="$protect_note Merged branches are deleted."
+    fi
+  else
+    protect_note="Couldn't protect $default_branch: a private repo needs GitHub Pro or Team for branch protection, and you need admin rights."
+  fi
+elif [ "$protect" -eq 1 ]; then
+  if [ -z "$slug_gh" ]; then protect_note="Didn't protect the default branch: the repo isn't on GitHub."; else protect_note="Didn't protect the default branch: gh is not installed."; fi
+fi
+
 echo
 echo "Set up '$stack' ($mode) in $target"
 echo "Notes (plan, product brief, decisions): $notes_dir"
@@ -330,13 +409,25 @@ if [ "$inplace" -eq 0 ] && [ "$KIND" = starter ]; then
   echo "Format them, or list the ones that must stay as they are in .prettierignore."
 fi
 echo
+if [ -n "$pr_url" ]; then
+  echo "Opened the setup PR: $pr_url"
+  echo "You're on the ai-repo-setup branch. Push follow-up changes to it; after you merge it, switch back to $base and pull."
+else
+  echo "$pr_note"
+fi
+[ -z "$protect_note" ] || echo "$protect_note"
+echo
 echo "Next:"
 if [ "$KIND" = starter ]; then
   echo "  .claude/scripts/setup && .claude/scripts/check"
 else
   echo "  Fill in .claude/scripts/ for this repo's tools, then run .claude/scripts/check."
 fi
-echo "  Fill in the Project section of .claude/CLAUDE.md, then commit."
+if [ -n "$pr_url" ]; then
+  echo "  Fill in the Project section of .claude/CLAUDE.md, push it to the setup PR, then merge the PR."
+else
+  echo "  Fill in the Project section of .claude/CLAUDE.md, then commit."
+fi
 echo "  Then read .claude/WORKFLOW.md for the loop, from /kickoff to the merge."
 if [ "$ci_review" = true ]; then
   echo "  For the Claude review on PRs: run /install-github-app in Claude Code, and add the ANTHROPIC_API_KEY"

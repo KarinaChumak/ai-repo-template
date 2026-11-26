@@ -22,8 +22,22 @@ fail() {
 # External notes go under this fake home, never the real ~/claude-notes.
 notes_home=$work/home
 mkdir -p "$notes_home"
+# gh is a stub that logs its arguments, so no test reaches GitHub. HOME is fake, so git needs an identity.
+gh_log=$work/gh.log
+mkdir -p "$work/bin"
+cat >"$work/bin/gh" <<'EOF'
+#!/bin/bash
+printf '%s\n' "$*" >>"$GH_LOG"
+case "$1 $2" in
+  "pr create") echo https://github.com/me/task/pull/1 ;;
+  "repo view") echo main ;;
+  "api -X") cat >/dev/null ;;
+esac
+EOF
+chmod +x "$work/bin/gh"
 run_init() {
-  HOME=$notes_home "$bash_bin" "$@" >/dev/null
+  HOME=$notes_home GH=$work/bin/gh GH_LOG=$gh_log GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t \
+    "$bash_bin" "$@" >/dev/null
 }
 
 # A path from ai-setup.json on disk: ~/ is the fake home, anything else is inside the repo.
@@ -404,6 +418,71 @@ expect_quick_check_fails() {
   if (cd "$app" && .claude/scripts/quick-check >/dev/null 2>&1); then fail "$label: quick-check passed with $file"; fi
   rm "$app/$file"
 }
+
+# A git repo with one commit whose origin is https://github.com/me/task.git, rewritten to a local bare
+# repo so pushes land there.
+make_gh_repo() {
+  local dir=$1 bare=$2
+  mkdir -p "$dir"
+  (
+    cd "$dir"
+    git init -q -b main 2>/dev/null || { git init -q && git checkout -q -b main; }
+    [ -n "$(ls -A . | grep -vx .git)" ] || echo '# Task' >README.md
+    git add -A && git -c user.name=t -c user.email=t@t commit -qm start
+    git init -q --bare "$bare"
+    git remote add origin https://github.com/me/task.git
+    git config url."$bare".insteadOf https://github.com/me/task.git
+    git -c user.name=t -c user.email=t@t push -q origin main
+  )
+}
+
+echo "== setup PR: init commits its files on ai-repo-setup, pushes and opens the PR"
+repo="$work/pr-repo"
+bare="$work/pr-origin.git"
+make_gh_repo "$repo" "$bare"
+: >"$gh_log"
+run_init "$here/init" --stack none --into "$repo" || fail "setup PR: init failed"
+[ "$(git -C "$repo" branch --show-current)" = ai-repo-setup ] || fail "setup PR: not left on ai-repo-setup"
+[ -z "$(git -C "$repo" status --porcelain)" ] || fail "setup PR: files left uncommitted: $(git -C "$repo" status --porcelain)"
+git -C "$bare" ls-tree -r --name-only ai-repo-setup | grep -qxF .claude/CLAUDE.md || fail "setup PR: the pushed branch has no .claude/CLAUDE.md"
+[ "$(git -C "$bare" log -1 --format=%s ai-repo-setup)" = "AI repo setup" ] || fail "setup PR: commit message isn't 'AI repo setup'"
+[ "$(git -C "$bare" rev-parse main)" = "$(git -C "$repo" rev-parse main)" ] || fail "setup PR: main changed"
+grep -qF 'pr create -R me/task --base main --head ai-repo-setup --title AI repo setup' "$gh_log" || fail "setup PR: no gh pr create: $(cat "$gh_log")"
+if grep -q 'protection\|delete_branch' "$gh_log"; then fail "setup PR: changed an existing repo's settings without --protect-main"; fi
+run_init "$here/init" --stack none --into "$repo" || fail "setup PR: second run failed"
+[ "$(grep -c 'pr create' "$gh_log")" = 1 ] || fail "setup PR: second run opened another PR"
+
+echo "== setup PR: skipped with uncommitted changes or --no-pr; --protect-main protects main"
+repo="$work/pr-dirty"
+make_gh_repo "$repo" "$work/pr-dirty.git"
+echo wip >"$repo/wip.txt"
+: >"$gh_log"
+run_init "$here/init" --stack none --into "$repo" --protect-main || fail "setup PR, dirty: init failed"
+[ "$(git -C "$repo" branch --show-current)" = main ] || fail "setup PR, dirty: switched branch"
+if git -C "$repo" rev-parse -q --verify refs/heads/ai-repo-setup >/dev/null; then fail "setup PR, dirty: created ai-repo-setup"; fi
+if grep -q 'pr create' "$gh_log"; then fail "setup PR, dirty: opened a PR"; fi
+grep -qF 'api -X PUT repos/me/task/branches/main/protection --input -' "$gh_log" || fail "setup PR, dirty: --protect-main didn't protect main: $(cat "$gh_log")"
+repo="$work/pr-nopr"
+make_gh_repo "$repo" "$work/pr-nopr.git"
+: >"$gh_log"
+run_init "$here/init" --stack none --into "$repo" --no-pr || fail "setup PR, --no-pr: init failed"
+if git -C "$repo" rev-parse -q --verify refs/heads/ai-repo-setup >/dev/null || [ -s "$gh_log" ]; then
+  fail "setup PR, --no-pr: committed or called gh: $(cat "$gh_log")"
+fi
+
+echo "== setup PR: a new project opens the PR and protects main"
+copy="$work/pr-new/task"
+new_project "$copy"
+make_gh_repo "$copy" "$work/pr-new.git"
+: >"$gh_log"
+run_init "$copy/init" --stack none || fail "setup PR, new: init failed"
+[ -z "$(git -C "$copy" status --porcelain)" ] || fail "setup PR, new: files left uncommitted"
+if git -C "$work/pr-new.git" ls-tree -r --name-only ai-repo-setup | grep -qE '^(init|core/)'; then
+  fail "setup PR, new: the template's own files are still on the branch"
+fi
+grep -qF 'pr create -R me/task' "$gh_log" || fail "setup PR, new: no PR"
+grep -qF 'branches/main/protection' "$gh_log" || fail "setup PR, new: main not protected"
+grep -qF 'api -X PATCH repos/me/task -F delete_branch_on_merge=true' "$gh_log" || fail "setup PR, new: merged branches aren't deleted: $(cat "$gh_log")"
 
 if [ "$full" -eq 1 ]; then
   for stack_dir in "$here"/stacks/*/; do
