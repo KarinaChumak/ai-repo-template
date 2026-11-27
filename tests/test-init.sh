@@ -381,11 +381,14 @@ size() { (cd "$repo" && PR_SIZE_LIMIT=${limit:-500} "$bash_bin" .claude/scripts/
   lines 2000 >pnpm-lock.yaml
   lines 900 >src/generated/deep/api.ts
   lines 100 >claude-notes/plan.md
+  mkdir -p docs dist/assets
+  lines 60 >docs/guide.md
+  lines 40 >dist/assets/app.js
   git -c user.name=t -c user.email=t@t add -A
   git -c user.name=t -c user.email=t@t commit -qm a
 ) || fail "pr-size: setting up the repo failed"
 out=$(size) || fail "pr-size: failed at 300 lines: $out"
-printf '%s\n' "$out" | grep -qF 'pr-size: 300 changed lines against main (limit 500); 3000 more in ignored files' ||
+printf '%s\n' "$out" | grep -qF 'pr-size: 300 changed lines against main (limit 500); 3100 more in ignored files' ||
   fail "pr-size: wrong count: $out"
 lines 250 >"$repo/src/b.ts"
 if out=$(size); then fail "pr-size: passed at 550 lines, counting the untracked file: $out"; fi
@@ -396,7 +399,7 @@ sed -i.bak '1,200d' "$repo/src/a.ts" && rm "$repo/src/a.ts.bak"
 (cd "$repo" && git -c user.name=t -c user.email=t@t commit -qam shrink)
 out=$(size)
 printf '%s\n' "$out" | grep -qF 'pr-size: 100 changed lines' || fail "pr-size: deleted lines on the branch aren't counted: $out"
-(cd "$repo" && git mv .claude/WORKFLOW.md WORKFLOW-moved.md && echo moved >>WORKFLOW-moved.md &&
+(cd "$repo" && git mv .claude/settings.json settings-moved.json && echo moved >>settings-moved.json &&
   git -c user.name=t -c user.email=t@t commit -qam rename)
 out=$(size)
 printf '%s\n' "$out" | grep -qF 'pr-size: 101 changed lines' || fail "pr-size: a renamed file with one new line isn't counted as 1 line: $out"
