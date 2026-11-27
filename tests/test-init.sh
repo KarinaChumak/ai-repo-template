@@ -325,6 +325,19 @@ if git -C "$repo" rev-parse -q --verify T-01-sign-in >/dev/null; then fail "tick
 ) || fail "ticket: pushing from another clone failed"
 t3=$(cd "$repo" && "$bash_bin" .claude/scripts/ticket start T-03) || fail "ticket: start T-03 failed"
 [ -f "$repo/.claude/worktrees/T-03/remote.txt" ] || fail "ticket: T-03 didn't start from origin/main when it was ahead"
+[ -f "$repo/remote.txt" ] && [ "$(git -C "$repo" rev-parse main)" = "$(git -C "$repo" rev-parse origin/main)" ] ||
+  fail "ticket: start didn't pull origin/main into the main checkout"
+# The main checkout on main with an uncommitted change: start leaves it alone and still uses origin/main.
+(
+  cd "$work/ticket-other" && echo remote2 >remote2.txt && git add remote2.txt &&
+    git -c user.name=t -c user.email=t@t commit -qm remote2 && git push -q origin HEAD:main
+) || fail "ticket: pushing remote2 failed"
+echo edited >>"$repo/claude-notes/plan.md"
+(cd "$repo" && "$bash_bin" .claude/scripts/ticket start T-04 >/dev/null) || fail "ticket: start T-04 with a dirty main checkout failed"
+[ -f "$repo/.claude/worktrees/T-04/remote2.txt" ] || fail "ticket: T-04 didn't start from origin/main"
+[ ! -f "$repo/remote2.txt" ] && grep -qx edited "$repo/claude-notes/plan.md" ||
+  fail "ticket: start updated a main checkout that had uncommitted changes"
+git -C "$repo" checkout -q -- claude-notes/plan.md
 [ "$(field "$t3" port)" = "$(field "$t1" port)" ] || fail "ticket: T-03 didn't reuse the freed port"
 
 echo "== gh opens PRs in origin, not in an upstream remote"
@@ -381,11 +394,14 @@ size() { (cd "$repo" && PR_SIZE_LIMIT=${limit:-500} "$bash_bin" .claude/scripts/
   lines 2000 >pnpm-lock.yaml
   lines 900 >src/generated/deep/api.ts
   lines 100 >claude-notes/plan.md
+  mkdir -p docs dist/assets
+  lines 60 >docs/guide.md
+  lines 40 >dist/assets/app.js
   git -c user.name=t -c user.email=t@t add -A
   git -c user.name=t -c user.email=t@t commit -qm a
 ) || fail "pr-size: setting up the repo failed"
 out=$(size) || fail "pr-size: failed at 300 lines: $out"
-printf '%s\n' "$out" | grep -qF 'pr-size: 300 changed lines against main (limit 500); 3000 more in ignored files' ||
+printf '%s\n' "$out" | grep -qF 'pr-size: 300 changed lines against main (limit 500); 3100 more in ignored files' ||
   fail "pr-size: wrong count: $out"
 lines 250 >"$repo/src/b.ts"
 if out=$(size); then fail "pr-size: passed at 550 lines, counting the untracked file: $out"; fi
@@ -396,7 +412,7 @@ sed -i.bak '1,200d' "$repo/src/a.ts" && rm "$repo/src/a.ts.bak"
 (cd "$repo" && git -c user.name=t -c user.email=t@t commit -qam shrink)
 out=$(size)
 printf '%s\n' "$out" | grep -qF 'pr-size: 100 changed lines' || fail "pr-size: deleted lines on the branch aren't counted: $out"
-(cd "$repo" && git mv .claude/WORKFLOW.md WORKFLOW-moved.md && echo moved >>WORKFLOW-moved.md &&
+(cd "$repo" && git mv .claude/settings.json settings-moved.json && echo moved >>settings-moved.json &&
   git -c user.name=t -c user.email=t@t commit -qam rename)
 out=$(size)
 printf '%s\n' "$out" | grep -qF 'pr-size: 101 changed lines' || fail "pr-size: a renamed file with one new line isn't counted as 1 line: $out"
