@@ -325,6 +325,19 @@ if git -C "$repo" rev-parse -q --verify T-01-sign-in >/dev/null; then fail "tick
 ) || fail "ticket: pushing from another clone failed"
 t3=$(cd "$repo" && "$bash_bin" .claude/scripts/ticket start T-03) || fail "ticket: start T-03 failed"
 [ -f "$repo/.claude/worktrees/T-03/remote.txt" ] || fail "ticket: T-03 didn't start from origin/main when it was ahead"
+[ -f "$repo/remote.txt" ] && [ "$(git -C "$repo" rev-parse main)" = "$(git -C "$repo" rev-parse origin/main)" ] ||
+  fail "ticket: start didn't pull origin/main into the main checkout"
+# The main checkout on main with an uncommitted change: start leaves it alone and still uses origin/main.
+(
+  cd "$work/ticket-other" && echo remote2 >remote2.txt && git add remote2.txt &&
+    git -c user.name=t -c user.email=t@t commit -qm remote2 && git push -q origin HEAD:main
+) || fail "ticket: pushing remote2 failed"
+echo edited >>"$repo/claude-notes/plan.md"
+(cd "$repo" && "$bash_bin" .claude/scripts/ticket start T-04 >/dev/null) || fail "ticket: start T-04 with a dirty main checkout failed"
+[ -f "$repo/.claude/worktrees/T-04/remote2.txt" ] || fail "ticket: T-04 didn't start from origin/main"
+[ ! -f "$repo/remote2.txt" ] && grep -qx edited "$repo/claude-notes/plan.md" ||
+  fail "ticket: start updated a main checkout that had uncommitted changes"
+git -C "$repo" checkout -q -- claude-notes/plan.md
 [ "$(field "$t3" port)" = "$(field "$t1" port)" ] || fail "ticket: T-03 didn't reuse the freed port"
 
 echo "== gh opens PRs in origin, not in an upstream remote"

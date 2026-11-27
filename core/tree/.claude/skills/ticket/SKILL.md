@@ -15,7 +15,7 @@ One ticket, one session, one worktree. The main checkout stays on `main`, so oth
 
 ## 2. Move into its worktree
 
-1. Run `.claude/scripts/ticket start <ID> <short-slug>`, with a slug of 2–4 words from the title. It prints `path`, `branch`, `port` and `new`.
+1. Run `.claude/scripts/ticket start <ID> <short-slug>`, with a slug of 2–4 words from the title. It pulls the latest `main` first, so the branch starts from it. It prints `path`, `branch`, `port` and `new`. Run it even when the session already started in a worktree of its own.
 2. Call the EnterWorktree tool with that `path`, so the rest of the session works there.
 3. If `new=yes`, run `.claude/scripts/setup` there: a new worktree has no installed dependencies.
 4. If `new=no`, this is a resumed ticket: read `git log --oneline main..HEAD` and `git status` to see where it stands, and carry on from there.
