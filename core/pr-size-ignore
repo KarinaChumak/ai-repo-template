@@ -17,9 +17,11 @@ coverage/*
 playwright-report/*
 test-results/*
 
-# Docs: Markdown anywhere (README, claude-notes, .claude instructions and skills).
-*.md
-*.mdx
+# Docs: READMEs, docs/ and the notes. Markdown in .claude/ still counts: it changes what Claude
+# does, so it gets the same review as code.
+README.md
+CHANGELOG.md
+docs/*
 claude-notes/*
 
 # Translations: once the project has them, add the per-language files here, such as

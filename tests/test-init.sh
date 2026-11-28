@@ -333,7 +333,8 @@ t3=$(cd "$repo" && "$bash_bin" .claude/scripts/ticket start T-03) || fail "ticke
     git -c user.name=t -c user.email=t@t commit -qm remote2 && git push -q origin HEAD:main
 ) || fail "ticket: pushing remote2 failed"
 echo edited >>"$repo/claude-notes/plan.md"
-(cd "$repo" && "$bash_bin" .claude/scripts/ticket start T-04 >/dev/null) || fail "ticket: start T-04 with a dirty main checkout failed"
+err=$(cd "$repo" && "$bash_bin" .claude/scripts/ticket start T-04 2>&1 >/dev/null) || fail "ticket: start T-04 with a dirty main checkout failed"
+printf '%s\n' "$err" | grep -qF 'uncommitted changes' || fail "ticket: start didn't say why it left the main checkout behind: $err"
 [ -f "$repo/.claude/worktrees/T-04/remote2.txt" ] || fail "ticket: T-04 didn't start from origin/main"
 [ ! -f "$repo/remote2.txt" ] && grep -qx edited "$repo/claude-notes/plan.md" ||
   fail "ticket: start updated a main checkout that had uncommitted changes"
@@ -403,6 +404,11 @@ size() { (cd "$repo" && PR_SIZE_LIMIT=${limit:-500} "$bash_bin" .claude/scripts/
 out=$(size) || fail "pr-size: failed at 300 lines: $out"
 printf '%s\n' "$out" | grep -qF 'pr-size: 300 changed lines against main (limit 500); 3100 more in ignored files' ||
   fail "pr-size: wrong count: $out"
+# Markdown in .claude/ changes what Claude does, so it counts.
+mkdir -p "$repo/.claude/rules" && lines 20 >"$repo/.claude/rules/extra.md"
+out=$(size)
+printf '%s\n' "$out" | grep -qF 'pr-size: 320 changed lines' || fail "pr-size: skipped a .md file in .claude/: $out"
+rm "$repo/.claude/rules/extra.md"
 lines 250 >"$repo/src/b.ts"
 if out=$(size); then fail "pr-size: passed at 550 lines, counting the untracked file: $out"; fi
 printf '%s\n' "$out" | grep -qF 'size-exception' || fail "pr-size: no advice when over the limit: $out"
